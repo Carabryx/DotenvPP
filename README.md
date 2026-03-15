@@ -237,7 +237,7 @@ See [docs/RESEARCH.md](docs/RESEARCH.md) for the full research synthesis.
 ## Tech Stack
 
 - **Language**: Rust (2021 edition)
-- **Crypto**: `age` (X25519), `aes-gcm`, `zeroize`
+- **Crypto**: `crabgraph` (default) — ergonomic wrapper over audited RustCrypto primitives, with WASM support and auto-zeroization. Raw `aes-gcm` + `x25519-dalek` available as opt-in alternative via feature flags.
 - **CLI**: `clap` v4 with `miette` for beautiful errors
 - **WASM**: `wasm-bindgen`, `wasm-pack`
 - **Serialization**: `serde`, `toml`

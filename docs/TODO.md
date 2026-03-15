@@ -76,24 +76,26 @@
 
 ## Phase 3: Encryption 🔒
 
-> **Goal**: Encrypt/decrypt `.env` files with modern cryptography.
+> **Goal**: Encrypt/decrypt `.env` files with modern cryptography via swappable backend.
 
+- [ ] Set up `crypto-crabgraph` feature flag (default) using `crabgraph` crate
+- [ ] Set up `crypto-rustcrypto` feature flag (opt-in) using raw `aes-gcm`, `x25519-dalek`, etc.
+- [ ] Implement shared `backend` module API (`encrypt`, `decrypt`, `keygen`) behind `#[cfg(feature)]`
 - [ ] Implement X25519 keypair generation
 - [ ] Implement per-value AES-256-GCM encryption
 - [ ] Implement encrypted file format (`.env.enc` or inline encrypted values)
 - [ ] Implement `dotenvpp encrypt` command
 - [ ] Implement `dotenvpp decrypt` command (to stdout, never to disk by default)
 - [ ] Implement `dotenvpp keygen` — generate new keypair
-- [ ] Implement `dotenvpp rotate` — re-encrypt with new keys
+- [ ] Implement `dotenvpp rotate` — re-encrypt with new keys (via CrabGraph's `key_rotation`)
 - [ ] Implement multiple recipients support
 - [ ] Implement `DOTENV_PRIVATE_KEY` env var for runtime decryption
 - [ ] Implement `dotenvpp run -- <command>` — decrypt + inject + run
-- [ ] Implement `zeroize` for all secret values in memory
+- [ ] Implement memory zeroization for all secret values (via CrabGraph's `secrets` module)
 - [ ] Test against known attack vectors (memory dumps, core dumps)
+- [ ] Verify both backends produce compatible encrypted output
 - [ ] Security audit checklist
-- [ ] Optional: pluggable KMS trait (AWS KMS, GCP KMS, Azure Key Vault)
-
-**Exit Criteria**: Encrypted `.env` files safe to commit to git, runtime decryption works.
+- [ ] Optional: pluggable KMS feature flags (AWS KMS, GCP KMS, Azure Key Vault)
 
 ---
 

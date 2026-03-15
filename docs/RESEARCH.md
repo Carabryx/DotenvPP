@@ -167,7 +167,7 @@ DotenvPP should honor the **spirit** of 12-Factor (config external to code) whil
 | Sealed Secrets | Asymmetric | In-cluster controller | Per-manifest |
 | secure-env (Node) | AES-256 | Passphrase | Entire file |
 
-**DotenvPP Approach**: Hybrid — AES-256-GCM with optional KMS backends. Per-value encryption like SOPS/dotenvx. Age/X25519 as default (modern, simple). Support for pluggable KMS via trait abstraction.
+**DotenvPP Approach**: AES-256-GCM + X25519, per-value encryption like SOPS/dotenvx. Default crypto backend is [CrabGraph](https://crates.io/crates/crabgraph) — an ergonomic Rust crypto toolkit built on audited RustCrypto primitives. Alternative raw RustCrypto backend available via compile-time feature flags (`crypto-rustcrypto`). No trait generics, no runtime cost — `#[cfg(feature)]` swap at compile time.
 
 ### 5.2 Variable Interpolation State of the Art
 
@@ -259,8 +259,8 @@ Running DotenvPP as WASM enables:
 ### 5.6 Rust Ecosystem Advantages
 
 - **Memory safety without GC** — critical for secrets handling (deterministic zeroization).
-- **`zeroize` crate** — securely wipe secrets from memory after use.
-- **`ring` / `rustcrypto` crates** — battle-tested cryptographic primitives.
+- **`crabgraph` crate** — ergonomic crypto toolkit wrapping RustCrypto with auto-zeroization, WASM support, and key rotation built in. Used as DotenvPP's default crypto backend.
+- **`ring` / `rustcrypto` crates** — battle-tested cryptographic primitives (available as opt-in alternative via feature flags).
 - **`serde` ecosystem** — best-in-class serialization/deserialization.
 - **`wasm-bindgen`** — first-class WASM compilation target.
 - **Cross-compilation** — single codebase for Linux, macOS, Windows, WASM.
@@ -323,8 +323,8 @@ Running DotenvPP as WASM enables:
 12. HashiCorp Vault — [vaultproject.io](https://vaultproject.io)
 
 ### Rust Crates Referenced
-13. `zeroize` — Secure memory wiping
-14. `ring` / `rustcrypto` — Cryptographic primitives
+13. `crabgraph` — Ergonomic crypto toolkit (default backend) — [crates.io](https://crates.io/crates/crabgraph)
+14. `aes-gcm` / `x25519-dalek` / `argon2` — Raw RustCrypto (opt-in alternative backend)
 15. `serde` — Serialization framework
 16. `wasm-bindgen` — WASM interop
 17. `schematic` — Layered config with schema

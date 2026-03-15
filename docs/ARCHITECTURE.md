@@ -211,7 +211,60 @@ severity = "error"
 
 ### 3.5 Crypto Engine (`dotenvpp-crypto`)
 
-**Encryption**: AES-256-GCM with X25519 key exchange (via `age` protocol).
+**Encryption**: AES-256-GCM with X25519 key exchange.
+
+**Swappable Backend via Feature Flags**:
+
+DotenvPP uses [CrabGraph](https://crates.io/crates/crabgraph) as its **default** crypto backend — an ergonomic Rust crypto toolkit built on audited RustCrypto primitives. For users who prefer using the raw audited crates directly, DotenvPP offers a compile-time alternative via feature flags. **No runtime overhead, no trait generics, no bloat.**
+
+```toml
+# Cargo.toml (dotenvpp-crypto)
+[features]
+default = ["crypto-crabgraph"]
+crypto-crabgraph  = ["crabgraph"]           # Default: ergonomic, batteries-included
+crypto-rustcrypto = ["aes-gcm", "x25519-dalek", "argon2", "hkdf", "zeroize"]
+```
+
+```rust
+// Default path — clean, zero bloat
+#[cfg(feature = "crypto-crabgraph")]
+mod backend {
+    use crabgraph::aead::{AesGcm256, CrabAead};
+    use crabgraph::asym::X25519KeyPair;
+
+    pub fn encrypt(key: &[u8], data: &[u8]) -> Result<Vec<u8>> {
+        let cipher = AesGcm256::new(key)?;
+        cipher.encrypt(data, None)
+    }
+}
+
+// Opt-in alternative — only compiles if explicitly chosen
+#[cfg(feature = "crypto-rustcrypto")]
+mod backend {
+    use aes_gcm::{Aes256Gcm, KeyInit, /* ... */};
+
+    pub fn encrypt(key: &[u8], data: &[u8]) -> Result<Vec<u8>> {
+        // Raw RustCrypto implementation
+    }
+}
+```
+
+**Why CrabGraph as default?**
+
+| CrabGraph Feature | DotenvPP Usage |
+|---|---|
+| `aead::AesGcm256` | Per-value encryption |
+| `asym::X25519KeyPair` | Key exchange for encryption |
+| `kdf::hkdf_extract_expand` | Key derivation from shared secrets |
+| `kdf::argon2_derive` | Passphrase-based encryption |
+| `hash::sha256` | Expression language `sha256()` function |
+| `rand::secure_bytes` | Nonce and key generation |
+| `secrets` module | Automatic memory zeroization |
+| `key_rotation` module | Built-in key rotation support |
+| `wasm` feature flag | Shared WASM compilation target |
+
+For **99% of users**: `cargo add dotenvpp` → uses CrabGraph → done.
+For the **paranoid 1%**: `cargo add dotenvpp --no-default-features --features crypto-rustcrypto`
 
 ```
 Encryption Flow:
@@ -235,10 +288,10 @@ Decryption Flow:
 
 **Key Features**:
 - **Per-value encryption**: Each value gets its own ephemeral key
-- **Memory zeroization**: Using Rust's `zeroize` crate, secrets are wiped from RAM after use
-- **Key rotation**: Built-in `dotenvpp rotate` command
+- **Memory zeroization**: Secrets wiped from RAM after use (via CrabGraph's `secrets` module)
+- **Key rotation**: Built-in `dotenvpp rotate` command (via CrabGraph's `key_rotation`)
 - **Multiple recipients**: Encrypt for multiple team members
-- **Pluggable KMS**: Trait-based abstraction for AWS KMS, GCP KMS, Vault integration
+- **Optional KMS integration**: AWS KMS, GCP KMS, Vault (future feature flags)
 
 ### 3.6 Environment Layering (`dotenvpp-layers`)
 
@@ -353,7 +406,8 @@ console.log(config.PORT);  // number, not string
 |---|---|
 | Core Language | Rust (2021 edition) |
 | Parser | Custom PEG / recursive descent |
-| Crypto | `age` (X25519), `aes-gcm`, `zeroize` |
+| Crypto (default) | `crabgraph` — ergonomic wrapper over RustCrypto primitives |
+| Crypto (alt) | `aes-gcm`, `x25519-dalek`, `argon2`, `hkdf`, `zeroize` (opt-in) |
 | Schema Format | TOML |
 | Policy Format | TOML with embedded expressions |
 | Serialization | `serde`, `serde_json`, `toml` |
