@@ -143,7 +143,7 @@ fn parse_value<'a, I>(
 where
     I: Iterator<Item = (usize, &'a str)>,
 {
-    let trimmed_start = value_start.trim_start_matches(|c: char| c == ' ' || c == '\t');
+    let trimmed_start = value_start.trim_start_matches([' ', '\t']);
     if trimmed_start.is_empty() {
         return Ok(String::new());
     }
@@ -234,9 +234,9 @@ where
                     if let Some((_, escaped)) = chars.next() {
                         push_escaped_char(&mut result, escaped);
                     } else {
-                        // Backslash at end of line inside double
-                        // quotes — the value continues on the next
-                        // line (line continuation).
+                        // Backslash at end of line inside double quotes is
+                        // preserved; the next input line is appended as a
+                        // literal newline.
                         result.push('\\');
                         let _ = idx; // suppress unused warning
                     }
@@ -248,12 +248,12 @@ where
         }
 
         // We reached the end of this line without finding a closing
-        // quote. This is a multiline value — continue to the next line.
+        // quote. This is a multiline value - continue to the next line.
         if let Some((_, next_line)) = lines.next() {
             result.push('\n');
             remaining = next_line;
         } else {
-            // No more lines — unterminated quote.
+            // No more lines - unterminated quote.
             return Err(ParseError::UnterminatedQuote {
                 line: line_num,
                 quote: '"',
@@ -266,7 +266,7 @@ where
 /// Strips inline comments (` #` or `\t#`), trims trailing whitespace,
 /// and decodes common backslash escapes.
 fn parse_unquoted(value_start: &str) -> String {
-    // Find inline comment — must be preceded by whitespace.
+    // Find inline comment - must be preceded by whitespace.
     let value = if let Some(pos) = find_inline_comment(value_start) {
         &value_start[..pos]
     } else {

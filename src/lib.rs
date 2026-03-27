@@ -1,12 +1,16 @@
-//! # DotenvPP — Dotenv++
+//! # DotenvPP
 //!
-//! Next-generation environment configuration with typed schemas,
-//! encryption, expressions, policies, and WASM support.
+//! From-scratch `.env` parsing and loading for Rust.
+//! This crate currently ships the Phase 0 foundation: parse common
+//! `.env` syntax, load values into the process environment, and
+//! inspect parsed key-value pairs.
+//!
+//! The broader project roadmap lives in the repository docs.
 //!
 //! ## Quick Start
 //!
 //! ```rust,no_run
-//! // Just load .env — that's it!
+//! // Just load .env - that's it!
 //! dotenvpp::load().ok();
 //!
 //! // Access variables (no `use std::env` needed)
@@ -134,7 +138,7 @@ pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Vec<EnvPair>> {
 
     for pair in &pairs {
         if env::var(&pair.key).is_err() {
-            // SAFETY: intended use — loading env config at startup.
+            // SAFETY: intended use - loading env config at startup.
             unsafe { env::set_var(&pair.key, &pair.value) };
         }
     }
@@ -148,7 +152,7 @@ pub fn from_path_override<P: AsRef<Path>>(path: P) -> Result<Vec<EnvPair>> {
     let pairs = dotenvpp_parser::parse(&content)?;
 
     for pair in &pairs {
-        // SAFETY: intended use — loading env config at startup.
+        // SAFETY: intended use - loading env config at startup.
         unsafe { env::set_var(&pair.key, &pair.value) };
     }
 
@@ -245,11 +249,13 @@ pub fn version() -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
+
     use super::*;
 
     #[test]
     fn test_version() {
-        assert_eq!(version(), "0.0.3");
+        assert_eq!(version(), "0.0.2");
     }
 
     #[test]

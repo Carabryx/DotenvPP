@@ -1,5 +1,7 @@
 //! Integration tests for the `dotenvpp` facade crate.
 
+#![allow(clippy::unwrap_used)]
+
 use std::io::Cursor;
 
 #[test]
