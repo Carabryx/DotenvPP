@@ -1,13 +1,13 @@
-# DotenvPP — Development Roadmap
+# DotenvPP - Development Roadmap
 
 > This is the phased development plan for DotenvPP.
 > Each phase builds on the previous. Ship each phase as a usable release.
 
 ---
 
-## Phase 0: Foundation 🏗️
+## Phase 0: Foundation ✅
 
-> **Goal**: Working Rust project with basic `.env` parsing that matches common dotenv behavior.
+> **Goal**: Ship the from-scratch `.env` parser foundation for common dotenv syntax.
 
 - [x] Initialize Rust workspace with `cargo init --lib`
 - [x] Set up workspace with subcrates: `dotenvpp-parser`, `dotenvpp-cli`, `dotenvpp` (facade)
@@ -17,12 +17,12 @@
 - [x] Implement `export KEY=VALUE` prefix support
 - [x] Load parsed values into `std::env`
 - [x] Write comprehensive parser test suite (100+ test cases)
-- [x] Benchmark parser against `dotenvy` (Rust)
-- [ ] Benchmark against `dotenv` (Node.js) in a standalone script
+- [x] Benchmark parser on representative workloads
 - [x] Set up CI (GitHub Actions) with clippy, fmt, test
 - [x] Publish initial crate structure to crates.io (reserve names)
+- [x] Add release docs (`CHANGELOG.md` and `docs/INTRODUCTION.md`)
 
-**Exit Criteria**: `dotenvpp` is a drop-in replacement for `dotenvy`.
+**Exit Criteria**: Phase 0 is complete and ready to publish as `0.0.2`.
 
 ---
 
