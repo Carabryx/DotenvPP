@@ -1,10 +1,10 @@
 [workspace]
-members = ["crates/*"]
+members = ["crates/*", "usage-examples"]
 resolver = "2"
 
 # ── Shared metadata ── bump version HERE only ──
 [workspace.package]
-version = "0.0.3"
+version = "0.0.2"
 edition = "2021"
 authors = ["Ariaj Sarkar <ariajsarkar@gmail.com>"]
 license = "MIT OR Apache-2.0"
@@ -33,7 +33,7 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "Dotenv++: Next-generation environment configuration with typed schemas, encryption, expressions, policies, and WASM support. Written in Rust."
+description = "From-scratch .env parsing and loading toolkit in Rust."
 readme = "README.md"
 keywords = ["dotenv", "env", "config", "environment", "secrets"]
 categories = ["config", "development-tools"]
@@ -50,7 +50,6 @@ dotenvpp-parser = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
-dotenvy = "0.15.7"
 
 [lints]
 workspace = true

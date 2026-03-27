@@ -5,7 +5,7 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "CLI tool for DotenvPP — next-generation environment configuration"
+description = "CLI for parsing, checking, and loading .env files with DotenvPP"
 
 [[bin]]
 name = "dotenvpp"
