@@ -56,23 +56,74 @@ jobs:
 
           echo "version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Prepare README for publish
-        id: prepare_readme
+      - name: Prepare release docs for publish
+        id: prepare_docs
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         run: |
           set -euo pipefail
           VERSION="${{ steps.release_meta.outputs.version }}"
-          echo "Ensuring README dependency snippets match version $VERSION"
+          TODAY=$(date +'%Y-%m-%d')
+          export VERSION TODAY
 
-          sed -i "s/^\([[:space:]]*\)dotenvpp = \".*\"/\1dotenvpp = \"$VERSION\"/" README.md
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+          
+          version = os.environ["VERSION"]
+          today = os.environ["TODAY"]
+          
+          readme = Path("README.md")
+          readme_text = readme.read_text()
+          readme_text = re.sub(
+              r'<img src="https://img\.shields\.io/badge/release-v[0-9.]+-171717" alt="Release [^"]+" />',
+              f'<img src="https://img.shields.io/badge/release-v{version}-171717" alt="Release {version}" />',
+              readme_text,
+              count=1,
+          )
+          readme.write_text(readme_text)
+          
+          changelog = Path("CHANGELOG.md")
+          changelog_text = changelog.read_text()
+          section = f"## [{version}] - {today}"
+          version_link = f"[{version}]: https://github.com/Carabryx/DotenvPP/releases/tag/v{version}"
+          unreleased_link = f"[Unreleased]: https://github.com/Carabryx/DotenvPP/compare/v{version}...HEAD"
+          
+          if section not in changelog_text:
+              marker = "## [Unreleased]\n"
+              if marker not in changelog_text:
+                  raise SystemExit("CHANGELOG.md is missing ## [Unreleased]")
+          
+              changelog_text = changelog_text.replace(marker, marker + "\n" + section + "\n\n", 1)
+          
+          if unreleased_link not in changelog_text:
+              changelog_text = re.sub(
+                  r'^\[Unreleased\]: .*$',
+                  unreleased_link,
+                  changelog_text,
+                  count=1,
+                  flags=re.M,
+              )
+          
+          if version_link not in changelog_text:
+              changelog_text = re.sub(
+                  r'^\[Unreleased\]: .*$',
+                  lambda match: f"{match.group(0)}\n{version_link}",
+                  changelog_text,
+                  count=1,
+                  flags=re.M,
+              )
+          
+          changelog.write_text(changelog_text)
+          PY
 
-          if git diff --quiet README.md; then
-            echo "README already matches version $VERSION"
+          if git diff --quiet README.md CHANGELOG.md; then
+            echo "Release docs already match version $VERSION"
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            echo "README updated in working tree before publish"
+            echo "Release docs updated in working tree before publish"
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            git diff -- README.md
+            git diff -- README.md CHANGELOG.md
           fi
 
       # Publish workspace crates in dependency order
@@ -108,45 +159,98 @@ jobs:
           files: |
             Cargo.toml
             README.md
+            CHANGELOG.md
             LICENSE-MIT
             LICENSE-APACHE
 
-      - name: Persist README version on main
-        id: sync_readme_main
+      - name: Persist release docs on main
+        id: sync_docs_main
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         run: |
           set -euo pipefail
           VERSION="${{ steps.release_meta.outputs.version }}"
+          TODAY=$(date +'%Y-%m-%d')
+          export VERSION TODAY
 
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
-          # Discard pre-publish README edit before switching branches
-          git checkout -- README.md
+          # Discard pre-publish release-doc edits before switching branches
+          git checkout -- README.md CHANGELOG.md
 
           git checkout main
           git pull origin main --rebase
 
-          sed -i "s/^\([[:space:]]*\)dotenvpp = \".*\"/\1dotenvpp = \"$VERSION\"/" README.md
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+          
+          version = os.environ["VERSION"]
+          today = os.environ["TODAY"]
+          
+          readme = Path("README.md")
+          readme_text = readme.read_text()
+          readme_text = re.sub(
+              r'<img src="https://img\.shields\.io/badge/release-v[0-9.]+-171717" alt="Release [^"]+" />',
+              f'<img src="https://img.shields.io/badge/release-v{version}-171717" alt="Release {version}" />',
+              readme_text,
+              count=1,
+          )
+          readme.write_text(readme_text)
+          
+          changelog = Path("CHANGELOG.md")
+          changelog_text = changelog.read_text()
+          section = f"## [{version}] - {today}"
+          version_link = f"[{version}]: https://github.com/Carabryx/DotenvPP/releases/tag/v{version}"
+          unreleased_link = f"[Unreleased]: https://github.com/Carabryx/DotenvPP/compare/v{version}...HEAD"
+          
+          if section not in changelog_text:
+              marker = "## [Unreleased]\n"
+              if marker not in changelog_text:
+                  raise SystemExit("CHANGELOG.md is missing ## [Unreleased]")
+          
+              changelog_text = changelog_text.replace(marker, marker + "\n" + section + "\n\n", 1)
+          
+          if unreleased_link not in changelog_text:
+              changelog_text = re.sub(
+                  r'^\[Unreleased\]: .*$',
+                  unreleased_link,
+                  changelog_text,
+                  count=1,
+                  flags=re.M,
+              )
+          
+          if version_link not in changelog_text:
+              changelog_text = re.sub(
+                  r'^\[Unreleased\]: .*$',
+                  lambda match: f"{match.group(0)}\n{version_link}",
+                  changelog_text,
+                  count=1,
+                  flags=re.M,
+              )
+          
+          changelog.write_text(changelog_text)
+          PY
 
-          if git diff --quiet README.md; then
-            echo "README already up to date on main"
+          if git diff --quiet README.md CHANGELOG.md; then
+            echo "Release docs already up to date on main"
             echo "commit_sha=" >> "$GITHUB_OUTPUT"
           else
-            git commit -am "docs: update readme version to $VERSION [skip ci]"
+            git commit -am "docs: update readme and changelog for version $VERSION [skip ci]"
             git push origin main
 
             COMMIT_SHA=$(git rev-parse HEAD)
             echo "commit_sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
-            echo "Pushed README update to main ($COMMIT_SHA)"
+            echo "Pushed release docs update to main ($COMMIT_SHA)"
           fi
 
-      - name: Sync README update to dev
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && steps.sync_readme_main.outputs.commit_sha != ''
+      - name: Sync release docs update to dev
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && steps.sync_docs_main.outputs.commit_sha != ''
         run: |
           set -euo pipefail
-          COMMIT_SHA="${{ steps.sync_readme_main.outputs.commit_sha }}"
-          echo "Syncing README commit $COMMIT_SHA to dev..."
+          COMMIT_SHA="${{ steps.sync_docs_main.outputs.commit_sha }}"
+          echo "Syncing release docs commit $COMMIT_SHA to dev..."
 
           git checkout dev
           git pull origin dev --rebase
@@ -161,7 +265,7 @@ jobs:
           echo "🍒 Cherry-picking commit $COMMIT_SHA..."
           if git cherry-pick "$COMMIT_SHA" 2>&1; then
             git push origin dev
-            echo "✅ SUCCESS: Cherry-picked and pushed README update to dev"
+            echo "✅ SUCCESS: Cherry-picked and pushed release docs update to dev"
           else
             PICK_EXIT=$?
             # Check if cherry-pick produced an empty commit
@@ -176,7 +280,7 @@ jobs:
             git cherry-pick --abort 2>/dev/null || true
             git reset --hard HEAD
 
-            echo "❌ CONFLICT: Could not cherry-pick README update to Dev"
+            echo "❌ CONFLICT: Could not cherry-pick release docs update to Dev"
             echo "   Manual resolution required:"
             echo "     git checkout Dev"
             echo "     git cherry-pick $COMMIT_SHA"
