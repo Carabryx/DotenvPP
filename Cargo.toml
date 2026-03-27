@@ -8,8 +8,8 @@ version = "0.0.3"
 edition = "2021"
 authors = ["Ariaj Sarkar <ariajsarkar@gmail.com>"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/AriajSarkar/DotenvPP"
-homepage = "https://github.com/AriajSarkar/DotenvPP"
+repository = "https://github.com/Carabryx/DotenvPP"
+homepage = "https://github.com/Carabryx/DotenvPP"
 
 # ── Shared dependency versions ──
 [workspace.dependencies]
