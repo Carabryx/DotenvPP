@@ -7,19 +7,20 @@
 
 ## Phase 0: Foundation 🏗️
 
-> **Goal**: Working Rust project with basic `.env` parsing that matches existing dotenv behavior.
+> **Goal**: Working Rust project with basic `.env` parsing that matches common dotenv behavior.
 
-- [ ] Initialize Rust workspace with `cargo init --lib`
-- [ ] Set up workspace with subcrates: `dotenvpp-parser`, `dotenvpp-cli`, `dotenvpp` (facade)
-- [ ] Implement standard `.env` parser (KEY=VALUE, comments, blank lines, quotes)
-- [ ] Support single-quoted, double-quoted, and unquoted values
-- [ ] Handle multiline values (both `\n` escapes and actual multilines in double quotes)
-- [ ] Implement `export KEY=VALUE` prefix support
-- [ ] Load parsed values into `std::env`
-- [ ] Write comprehensive parser test suite (100+ test cases)
-- [ ] Benchmark parser against `dotenvy` (Rust) and `dotenv` (Node.js)
-- [ ] Set up CI (GitHub Actions) with clippy, fmt, test
-- [ ] Publish initial crate structure to crates.io (reserve names)
+- [x] Initialize Rust workspace with `cargo init --lib`
+- [x] Set up workspace with subcrates: `dotenvpp-parser`, `dotenvpp-cli`, `dotenvpp` (facade)
+- [x] Implement standard `.env` parser (KEY=VALUE, comments, blank lines, quotes)
+- [x] Support single-quoted, double-quoted, and unquoted values
+- [x] Handle multiline values (both `\n` escapes and actual multiline quoted values)
+- [x] Implement `export KEY=VALUE` prefix support
+- [x] Load parsed values into `std::env`
+- [x] Write comprehensive parser test suite (100+ test cases)
+- [x] Benchmark parser against `dotenvy` (Rust)
+- [ ] Benchmark against `dotenv` (Node.js) in a standalone script
+- [x] Set up CI (GitHub Actions) with clippy, fmt, test
+- [x] Publish initial crate structure to crates.io (reserve names)
 
 **Exit Criteria**: `dotenvpp` is a drop-in replacement for `dotenvy`.
 
