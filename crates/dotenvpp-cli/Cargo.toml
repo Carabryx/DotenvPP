@@ -1,0 +1,20 @@
+[package]
+name = "dotenvpp-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "CLI tool for DotenvPP — next-generation environment configuration"
+
+[[bin]]
+name = "dotenvpp"
+path = "src/main.rs"
+
+[dependencies]
+dotenvpp        = { workspace = true }
+dotenvpp-parser = { workspace = true }
+clap            = { workspace = true }
+
+[lints]
+workspace = true
