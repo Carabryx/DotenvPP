@@ -3,6 +3,8 @@
 //! Organized by feature area as separate submodules.
 //! Target: 100+ test cases covering all parsing behaviors.
 
+#![allow(clippy::unwrap_used)]
+
 mod basic;
 mod blank_lines;
 mod comments;

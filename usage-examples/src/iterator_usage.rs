@@ -11,10 +11,7 @@ pub fn run() -> Result<(), dotenvpp::Error> {
     let pairs: Vec<_> = dotenvpp::from_path_iter(".env")?.collect();
 
     // Filter only feature flags.
-    let features: Vec<_> = pairs
-        .iter()
-        .filter(|p| p.key.starts_with("FEATURE_"))
-        .collect();
+    let features: Vec<_> = pairs.iter().filter(|p| p.key.starts_with("FEATURE_")).collect();
 
     println!("  🚩 Feature flags ({}):\n", features.len());
     for pair in &features {
@@ -27,10 +24,7 @@ pub fn run() -> Result<(), dotenvpp::Error> {
     }
 
     // Filter database vars.
-    let db_vars: Vec<_> = pairs
-        .iter()
-        .filter(|p| p.key.starts_with("DB_"))
-        .collect();
+    let db_vars: Vec<_> = pairs.iter().filter(|p| p.key.starts_with("DB_")).collect();
 
     println!("\n  🗄️  Database config ({}):\n", db_vars.len());
     for pair in &db_vars {

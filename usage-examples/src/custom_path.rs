@@ -10,10 +10,7 @@ pub fn run() -> Result<(), dotenvpp::Error> {
     // from .env if they exist).
     let pairs = dotenvpp::from_path_override(".env.production")?;
 
-    println!(
-        "  📋 Loaded {} variables from .env.production:\n",
-        pairs.len()
-    );
+    println!("  📋 Loaded {} variables from .env.production:\n", pairs.len());
 
     for pair in &pairs {
         println!("    {:<20} = {}", pair.key, pair.value);
