@@ -281,13 +281,50 @@ mod tests {
     #![allow(clippy::unwrap_used)]
 
     use super::*;
-    #[cfg(not(windows))]
+    use std::error::Error as _;
+    use std::fs;
     use std::sync::{Mutex, OnceLock};
+    use std::time::{SystemTime, UNIX_EPOCH};
 
-    #[cfg(not(windows))]
-    fn env_test_lock() -> &'static Mutex<()> {
-        static ENV_TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        ENV_TEST_LOCK.get_or_init(|| Mutex::new(()))
+    fn test_lock() -> std::sync::MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
+    }
+
+    struct TempEnvPath {
+        path: std::path::PathBuf,
+    }
+
+    impl TempEnvPath {
+        fn file(name: &str, contents: &str) -> Self {
+            let mut path = std::env::temp_dir();
+            let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+            path.push(format!("dotenvpp-lib-test-{}-{nanos}-{name}", std::process::id()));
+            fs::write(&path, contents).unwrap();
+            Self {
+                path,
+            }
+        }
+
+        fn directory() -> Self {
+            let mut path = std::env::temp_dir();
+            let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+            path.push(format!("dotenvpp-lib-dir-{}-{nanos}", std::process::id()));
+            fs::create_dir(&path).unwrap();
+            Self {
+                path,
+            }
+        }
+    }
+
+    impl Drop for TempEnvPath {
+        fn drop(&mut self) {
+            if self.path.is_dir() {
+                let _ = fs::remove_dir_all(&self.path);
+            } else {
+                let _ = fs::remove_file(&self.path);
+            }
+        }
     }
 
     #[test]
@@ -328,38 +365,143 @@ mod tests {
     fn test_from_path_preserves_existing_non_unicode_vars() {
         use std::ffi::OsString;
         use std::os::unix::ffi::OsStringExt;
-        use std::time::{SystemTime, UNIX_EPOCH};
 
-        struct TestCleanup {
-            key: String,
-            path: std::path::PathBuf,
-        }
-
-        impl Drop for TestCleanup {
-            fn drop(&mut self) {
-                // SAFETY: test cleanup for a temporary env var.
-                unsafe { std::env::remove_var(&self.key) };
-                let _ = std::fs::remove_file(&self.path);
-            }
-        }
-
-        let _guard = env_test_lock().lock().unwrap();
-        let unique = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        let key = format!("DOTENVPP_NON_UNICODE_KEY_{unique}");
-        let path = std::env::temp_dir().join(format!("dotenvpp-preserve-{}.env", unique));
-        std::fs::write(&path, format!("{key}=overridden\n")).unwrap();
-        let _cleanup = TestCleanup {
-            key: key.clone(),
-            path: path.clone(),
-        };
+        let _guard = test_lock();
+        let key = "DOTENVPP_NON_UNICODE_KEY";
+        let file = TempEnvPath::file("non-unicode.env", &format!("{key}=overridden\n"));
 
         let value = OsString::from_vec(vec![0x66, 0x80]);
 
         // SAFETY: test setup for a temporary env var.
-        unsafe { std::env::set_var(&key, &value) };
+        unsafe { std::env::set_var(key, &value) };
 
-        let pairs = from_path(&path).unwrap();
-        assert_eq!(pairs[0].key, key.as_str());
-        assert_eq!(std::env::var_os(&key).unwrap(), value);
+        let pairs = from_path(&file.path).unwrap();
+        assert_eq!(pairs[0].key, key);
+        assert_eq!(std::env::var_os(key).unwrap(), value);
+
+        // SAFETY: test cleanup for a temporary env var.
+        unsafe { std::env::remove_var(key) };
+    }
+
+    #[test]
+    fn test_error_display_and_sources() {
+        let io = Error::Io(std::io::Error::new(std::io::ErrorKind::NotFound, "missing file"));
+        assert!(format!("{io}").contains("I/O error"));
+        assert!(io.source().is_some());
+
+        let parse = Error::Parse(ParseError::InvalidKey {
+            line: 2,
+            key: "BAD-KEY".into(),
+        });
+        assert!(format!("{parse}").contains("parse error"));
+        assert!(parse.source().is_some());
+
+        let unicode = Error::NotUnicode("BAD".into());
+        assert!(format!("{unicode}").contains("invalid unicode"));
+        assert!(unicode.source().is_none());
+    }
+
+    #[test]
+    fn test_from_conversions() {
+        let io = Error::from(std::io::Error::other("boom"));
+        assert!(matches!(io, Error::Io(_)));
+
+        let parse = Error::from(ParseError::EmptyKey {
+            line: 1,
+        });
+        assert!(matches!(parse, Error::Parse(_)));
+    }
+
+    #[test]
+    fn test_from_path_sets_missing_vars_only() {
+        let _guard = test_lock();
+        let key = "DOTENVPP_LIB_FROM_PATH";
+        let file = TempEnvPath::file("from-path.env", &format!("{key}=from_file\n"));
+
+        // SAFETY: test cleanup and setup for a unique env var key.
+        unsafe { env::remove_var(key) };
+        let pairs = from_path(&file.path).unwrap();
+        assert_eq!(pairs.len(), 1);
+        assert_eq!(var(key).unwrap(), "from_file");
+
+        // SAFETY: test setup for a unique env var key.
+        unsafe { env::set_var(key, "existing") };
+        let pairs = from_path(&file.path).unwrap();
+        assert_eq!(pairs.len(), 1);
+        assert_eq!(var(key).unwrap(), "existing");
+
+        // SAFETY: test cleanup for a unique env var key.
+        unsafe { env::remove_var(key) };
+    }
+
+    #[test]
+    fn test_from_path_override_replaces_existing_vars() {
+        let _guard = test_lock();
+        let key = "DOTENVPP_LIB_OVERRIDE";
+        let file = TempEnvPath::file("override.env", &format!("{key}=from_file\n"));
+
+        // SAFETY: test setup for a unique env var key.
+        unsafe { env::set_var(key, "old_value") };
+        let pairs = from_path_override(&file.path).unwrap();
+        assert_eq!(pairs.len(), 1);
+        assert_eq!(var(key).unwrap(), "from_file");
+
+        // SAFETY: test cleanup for a unique env var key.
+        unsafe { env::remove_var(key) };
+    }
+
+    #[test]
+    fn test_from_path_iter_does_not_set_env() {
+        let _guard = test_lock();
+        let key = "DOTENVPP_LIB_ITER";
+        let file = TempEnvPath::file("iter.env", &format!("{key}=preview_only\n"));
+
+        // SAFETY: test cleanup and setup for a unique env var key.
+        unsafe { env::remove_var(key) };
+        let pairs: Vec<_> = from_path_iter(&file.path).unwrap().collect();
+        assert_eq!(pairs.len(), 1);
+        assert!(env::var(key).is_err());
+    }
+
+    #[test]
+    fn test_var_success_and_vars_snapshot() {
+        let _guard = test_lock();
+        let key = "DOTENVPP_LIB_VAR";
+
+        // SAFETY: test setup for a unique env var key.
+        unsafe { env::set_var(key, "visible") };
+        assert_eq!(var(key).unwrap(), "visible");
+        assert!(vars().any(|(name, value)| name == key && value == "visible"));
+
+        // SAFETY: test cleanup for a unique env var key.
+        unsafe { env::remove_var(key) };
+    }
+
+    #[test]
+    fn test_load_and_load_override_use_dotenv_in_current_dir() {
+        let _guard = test_lock();
+        let original_dir = env::current_dir().unwrap();
+        let temp_dir = TempEnvPath::directory();
+        let env_path = temp_dir.path.join(".env");
+        let key = "DOTENVPP_LIB_LOAD";
+
+        fs::write(&env_path, format!("{key}=from_dotenv\n")).unwrap();
+        env::set_current_dir(&temp_dir.path).unwrap();
+
+        // SAFETY: test cleanup and setup for a unique env var key.
+        unsafe { env::remove_var(key) };
+        let loaded = load().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(var(key).unwrap(), "from_dotenv");
+
+        fs::write(&env_path, format!("{key}=override_value\n")).unwrap();
+        let loaded = load_override().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(var(key).unwrap(), "override_value");
+
+        env::set_current_dir(original_dir).unwrap();
+
+        // SAFETY: test cleanup for a unique env var key.
+        unsafe { env::remove_var(key) };
     }
 }
