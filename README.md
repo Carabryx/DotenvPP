@@ -2,7 +2,7 @@
   <h1 align="center">🔐 DotenvPP</h1>
   <p align="center"><strong>Dotenv, but evolved. Environment configuration for the modern era.</strong></p>
   <p align="center">
-    <em>Written in Rust. Compiled to WASM. Zero compromises.</em>
+    <em>Phase 0 foundation in Rust. Interpolation and layering are next.</em>
   </p>
 </p>
 
@@ -46,130 +46,56 @@ DotenvPP reimagines environment configuration from first principles — taking e
 
 ## Features
 
-### 🎯 What dotenv should have been
+DotenvPP `0.0.2` is the Phase 0 release. It ships the parser foundation and the minimal facade/CLI needed to use it today.
 
-| Feature | dotenv | dotenvx | DotenvPP |
-|---|:---:|:---:|:---:|
-| Basic `KEY=VALUE` parsing | ✅ | ✅ | ✅ |
-| Variable interpolation (`${VAR}`) | ⚠️ | ✅ | ✅ |
-| Multi-environment layering | ❌ | ✅ | ✅ |
-| Encryption at rest | ❌ | ✅ | ✅ |
-| **Type system & validation** | ❌ | ❌ | ✅ |
-| **Schema definitions** | ❌ | ❌ | ✅ |
-| **Expression language** | ❌ | ❌ | ✅ |
-| **Policy-as-code rules** | ❌ | ❌ | ✅ |
-| **Memory zeroization** | ❌ | ❌ | ✅ |
-| **WASM support** | ❌ | ❌ | ✅ |
-| Written in Rust | ❌ | ❌ | ✅ |
-
-### 🔒 Security-First
-
-- **Encryption at rest** — AES-256-GCM with X25519 key exchange. Encrypted files are safe to commit to git.
-- **Memory zeroization** — Secrets are wiped from RAM after use via Rust's `zeroize` crate.
-- **Leak prevention** — Built-in git hooks, CI scanners, and audit commands to catch exposed secrets.
-- **Per-value encryption** — Each value encrypted with a unique ephemeral key.
-
-### 📐 Typed Configuration
-
-```toml
-# .env.schema
-[vars.PORT]
-type = "u16"
-default = 8080
-range = [1024, 65535]
-
-[vars.DATABASE_URL]
-type = "url"
-required = true
-protocols = ["postgres", "postgresql"]
-
-[vars.LOG_LEVEL]
-type = "enum"
-values = ["trace", "debug", "info", "warn", "error"]
-default = "info"
-```
-
-Your app crashes **at startup** with a clear error — not at 3 AM in production when it tries to parse `PORT=banana` as a number.
-
-### 🧮 Computed Configuration
-
-```env
-MAX_WORKERS = ${CPU_COUNT} * 2
-API_URL = "${PROTOCOL}://${HOST}:${PORT}/api/v${API_VERSION}"
-LOG_LEVEL = if $ENV == "production" then "warn" else "debug"
-```
-
-A safe, sandboxed expression language. No I/O, no loops, no side effects.
-
-### 📋 Policy Engine
-
-```toml
-# .env.policy
-[[rules]]
-name = "no-debug-in-prod"
-condition = "ENV == 'production' && LOG_LEVEL == 'debug'"
-severity = "error"
-```
-
-Like OPA, but for your `.env` files. Enforce security rules across all environments.
+| Capability | Status | Notes |
+|---|---|---|
+| Basic `KEY=VALUE` parsing | ✅ Shipped | Core parser behavior |
+| Comments, blank lines, `export` | ✅ Shipped | Common dotenv syntax |
+| Single-quoted, double-quoted, and unquoted values | ✅ Shipped | Includes multiline quoted values |
+| BOM handling and common escape decoding | ✅ Shipped | Phase 0 parser behavior |
+| Load parsed values into `std::env` | ✅ Shipped | `load`, `from_path`, override variants |
+| CLI `check` and `run` commands | ✅ Shipped | Current CLI surface |
+| Variable interpolation (`${VAR}`) | ⏳ Phase 1 | Planned next |
+| Environment layering | ⏳ Phase 1 | Planned next |
+| Schema and type system | ⏳ Phase 2 | Roadmap |
+| Encryption | ⏳ Phase 3 | Roadmap |
+| Expression language | ⏳ Phase 4 | Roadmap |
+| Policy engine | ⏳ Phase 5 | Roadmap |
+| WASM target | ⏳ Phase 6 | Roadmap |
 
 ---
 
 ## Quick Start
 
-> ⚠️ **DotenvPP is in active development.** The API shown here represents the design target.
+The commands and APIs below are what exist today in Phase 0. Higher-level APIs for schemas, encryption, expressions, policies, and WASM are still roadmap items in [docs/TODO.md](docs/TODO.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ### CLI
 
 ```bash
 # Install
-cargo install dotenvpp
+cargo install dotenvpp-cli
 
-# Parse and validate
-dotenvpp check
+# Check that a .env file parses successfully
+dotenvpp check --file .env
 
-# Encrypt your .env file
-dotenvpp encrypt
-
-# Run a command with decrypted env vars
-dotenvpp run -- node server.js
-
-# Generate .env.example from schema
-dotenvpp schema example
+# Load a .env file and run a command with those variables
+dotenvpp run --file .env -- cargo test
 ```
 
 ### Rust Crate
 
 ```rust
-use dotenvpp::Config;
-
-#[derive(dotenvpp::Schema)]
-struct AppConfig {
-    #[env(required)]
-    database_url: url::Url,
-
-    #[env(default = 8080, range(1024..=65535))]
-    port: u16,
-
-    #[env(secret, min_length = 32)]
-    api_key: dotenvpp::Secret<String>,
-}
-
 fn main() -> Result<(), dotenvpp::Error> {
-    let config: AppConfig = Config::from_env()?;
-    println!("Listening on port {}", config.port);
+    dotenvpp::load()?;
+
+    let app_name = dotenvpp::var("APP_NAME")?;
+    println!("APP_NAME={app_name}");
+
+    let preview = dotenvpp::from_read(&b"PORT=3000\nDEBUG=true"[..])?;
+    assert_eq!(preview.len(), 2);
+
     Ok(())
-}
-```
-
-### WASM (Browser/Edge)
-
-```javascript
-import { DotenvPP } from '@dotenvpp/wasm';
-
-const result = DotenvPP.validate(envFile, schema);
-if (!result.valid) {
-  console.error(result.errors);
 }
 ```
 
@@ -178,38 +104,35 @@ if (!result.valid) {
 ## What Makes It Different
 
 ### vs. dotenv / dotenvy
-DotenvPP is a **superset**. Every existing `.env` file works unchanged. But DotenvPP adds types, schemas, encryption, expressions, and policies.
+DotenvPP starts with a from-scratch parser instead of wrapping an existing dotenv crate. That keeps the Phase 0 surface small today while leaving room for interpolation, layering, schemas, and other roadmap features to grow on top of parser behavior the project owns.
 
 ### vs. dotenvx
-dotenvx adds encryption. DotenvPP adds encryption **and** types, schemas, expressions, policies, WASM support, and memory safety. Built in Rust, not JavaScript.
+dotenvx is already further ahead on encrypted workflows. DotenvPP is taking a different path: first ship a solid parser and facade, then build Phase 1 interpolation/layering and later phases on that foundation in Rust.
 
 ### vs. HashiCorp Vault / AWS Secrets Manager
-Those are infrastructure. DotenvPP is a **tool**. No servers, no SaaS, no ops overhead. Use DotenvPP for local dev and CI. Use Vault for production secrets if you need to — DotenvPP can bridge both.
+Those are infrastructure products. DotenvPP is a developer-facing library and CLI. Even in Phase 0, the goal is local parsing/loading ergonomics rather than replacing secret-management platforms.
 
 ### vs. SOPS
-SOPS is encryption-only. DotenvPP is encryption + types + schemas + expressions + policies + WASM.
+SOPS is focused on encryption. DotenvPP is broader in roadmap scope, but those later capabilities are still planned work rather than current release features.
 
 ---
 
 ## Architecture
 
-DotenvPP is built as a modular Rust workspace:
+Current workspace layout:
 
 ```
 dotenvpp/
 ├── crates/
-│   ├── dotenvpp-parser/    # Zero-copy .env parser
-│   ├── dotenvpp-schema/    # Schema validation engine
-│   ├── dotenvpp-expr/      # Expression language evaluator
-│   ├── dotenvpp-policy/    # Policy-as-code engine
-│   ├── dotenvpp-crypto/    # Encryption (AES-256-GCM + X25519)
-│   ├── dotenvpp-layers/    # Environment layering
-│   └── dotenvpp-wasm/      # WASM bindings
-├── dotenvpp/               # Facade crate (re-exports)
-└── dotenvpp-cli/           # CLI tool
+│   ├── dotenvpp-parser/    # Phase 0 parser engine
+│   └── dotenvpp-cli/       # Phase 0 CLI binary
+├── src/lib.rs              # Facade crate API
+├── tests/                  # Facade integration tests
+├── examples/               # In-crate examples
+└── usage-examples/         # Separate demo crate (`publish = false`)
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full technical vision.
+Planned crates such as `dotenvpp-schema`, `dotenvpp-expr`, `dotenvpp-policy`, `dotenvpp-crypto`, `dotenvpp-layers`, and `dotenvpp-wasm` are part of the design vision, not current workspace members. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for that longer-term target.
 
 ---
 
@@ -246,21 +169,22 @@ See [docs/RESEARCH.md](docs/RESEARCH.md) for the full research synthesis.
 ## Tech Stack
 
 - **Language**: Rust (2021 edition)
-- **Crypto**: `crabgraph` (default) — ergonomic wrapper over audited RustCrypto primitives, with WASM support and auto-zeroization. Raw `aes-gcm` + `x25519-dalek` available as opt-in alternative via feature flags.
-- **CLI**: `clap` v4 with `miette` for beautiful errors
-- **WASM**: `wasm-bindgen`, `wasm-pack`
-- **Serialization**: `serde`, `toml`
-- **Testing**: `proptest` (property-based), `insta` (snapshot)
+- **CLI**: `clap` v4
+- **Parser**: custom parser in `dotenvpp-parser`
+- **Benchmarking**: `criterion`
+- **Quality**: `cargo fmt`, `clippy`, tests, GitHub Actions
+
+Planned later phases introduce additional dependencies such as `miette`, `serde`, `toml`, `crabgraph`, and `wasm-bindgen` as those capabilities land.
 
 ---
 
 ## Contributing
 
-DotenvPP is in the design phase. Contributions welcome!
+DotenvPP has shipped Phase 0 and is moving toward Phase 1. Contributions welcome.
 
 1. Read [docs/RESEARCH.md](docs/RESEARCH.md) for context
 2. Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the technical vision
-3. Check [docs/TODO.md](docs/TODO.md) for what needs doing
+3. Check [docs/TODO.md](docs/TODO.md) for the active roadmap, especially interpolation and layering
 4. Open an issue or PR
 
 ---

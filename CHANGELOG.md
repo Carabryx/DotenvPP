@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Clarified README and usage-example docs so Phase 1+ items stay marked as roadmap work, while Phase 0 docs focus on the shipped parser, facade, CLI, and manual override behavior.
+
 ## [0.0.2] - 2026-03-27
 
 ### Added
