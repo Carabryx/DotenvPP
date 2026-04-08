@@ -75,12 +75,14 @@ jobs:
           
           readme = Path("README.md")
           readme_text = readme.read_text()
-          readme_text = re.sub(
-              r'<img src="https://img\.shields\.io/badge/release-v[0-9.]+-171717" alt="Release [^"]+" />',
-              f'<img src="https://img.shields.io/badge/release-v{version}-171717" alt="Release {version}" />',
-              readme_text,
-              count=1,
-          )
+          # Only update the badge for stable releases (no pre-release suffix)
+          if "-" not in version:
+              readme_text = re.sub(
+                  r'<img src="https://img\.shields\.io/badge/release-v[^"]+" alt="Release [^"]+" />',
+                  f'<img src="https://img.shields.io/badge/release-v{version}-171717" alt="Release {version}" />',
+                  readme_text,
+                  count=1,
+              )
           readme.write_text(readme_text)
           
           changelog = Path("CHANGELOG.md")
@@ -191,12 +193,14 @@ jobs:
           
           readme = Path("README.md")
           readme_text = readme.read_text()
-          readme_text = re.sub(
-              r'<img src="https://img\.shields\.io/badge/release-v[0-9.]+-171717" alt="Release [^"]+" />',
-              f'<img src="https://img.shields.io/badge/release-v{version}-171717" alt="Release {version}" />',
-              readme_text,
-              count=1,
-          )
+          # Only update the badge for stable releases (no pre-release suffix)
+          if "-" not in version:
+              readme_text = re.sub(
+                  r'<img src="https://img\.shields\.io/badge/release-v[^"]+" alt="Release [^"]+" />',
+                  f'<img src="https://img.shields.io/badge/release-v{version}-171717" alt="Release {version}" />',
+                  readme_text,
+                  count=1,
+              )
           readme.write_text(readme_text)
           
           changelog = Path("CHANGELOG.md")
@@ -280,11 +284,11 @@ jobs:
             git cherry-pick --abort 2>/dev/null || true
             git reset --hard HEAD
 
-            echo "❌ CONFLICT: Could not cherry-pick release docs update to Dev"
+            echo "❌ CONFLICT: Could not cherry-pick release docs update to dev"
             echo "   Manual resolution required:"
-            echo "     git checkout Dev"
+            echo "     git checkout dev"
             echo "     git cherry-pick $COMMIT_SHA"
             echo "     # resolve conflicts"
-            echo "     git push origin Dev"
+            echo "     git push origin dev"
             exit 1
           fi

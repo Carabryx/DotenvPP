@@ -263,7 +263,6 @@ version = "0.0.2"
 dependencies = [
  "clap",
  "dotenvpp",
- "dotenvpp-parser",
 ]
 
 [[package]]

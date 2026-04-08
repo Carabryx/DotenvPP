@@ -12,9 +12,8 @@ name = "dotenvpp"
 path = "src/main.rs"
 
 [dependencies]
-dotenvpp        = { workspace = true }
-dotenvpp-parser = { workspace = true }
-clap            = { workspace = true }
+dotenvpp = { workspace = true }
+clap     = { workspace = true }
 
 [lints]
 workspace = true
