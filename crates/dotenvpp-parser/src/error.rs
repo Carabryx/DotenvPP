@@ -45,9 +45,9 @@ impl fmt::Display for ParseError {
         match self {
             Self::MissingSeparator {
                 line,
-                content,
+                ..
             } => {
-                write!(f, "line {line}: missing `=` separator in `{content}`")
+                write!(f, "line {line}: missing `=` separator")
             }
             Self::EmptyKey {
                 line,
@@ -76,3 +76,24 @@ impl fmt::Display for ParseError {
 
 #[cfg(feature = "std")]
 impl std::error::Error for ParseError {}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use super::ParseError;
+
+    #[test]
+    fn missing_separator_display_redacts_content() {
+        let err = ParseError::MissingSeparator {
+            line: 3,
+            content: "API_KEY abc123".into(),
+        };
+        let msg = format!("{err}");
+
+        assert!(msg.contains("line 3"));
+        assert!(msg.contains("missing `=` separator"));
+        assert!(!msg.contains("API_KEY"));
+        assert!(!msg.contains("abc123"));
+    }
+}

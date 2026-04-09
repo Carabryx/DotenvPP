@@ -29,8 +29,9 @@
 //! | [`var()`] | Get a single env var |
 //! | [`vars()`] | Iterate all env vars |
 
+use std::collections::HashSet;
 use std::env;
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io::Read;
 use std::path::Path;
@@ -141,9 +142,10 @@ pub fn load_override() -> Result<Vec<EnvPair>> {
 pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Vec<EnvPair>> {
     let content = fs::read_to_string(path)?;
     let pairs = dotenvpp_parser::parse(&content)?;
+    let existing_keys: HashSet<OsString> = env::vars_os().map(|(key, _)| key).collect();
 
     for pair in &pairs {
-        if env::var(&pair.key).is_err() {
+        if !existing_keys.contains(OsStr::new(&pair.key)) {
             // SAFETY: intended use - loading env config at startup.
             unsafe { env::set_var(&pair.key, &pair.value) };
         }
@@ -296,5 +298,32 @@ mod tests {
         let msg = format!("{err}");
         assert!(msg.contains("MISSING_KEY"));
         assert!(msg.contains("not found"));
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn test_from_path_preserves_existing_non_unicode_vars() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let path = std::env::temp_dir().join(format!(
+            "dotenvpp-preserve-{}.env",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        std::fs::write(&path, "KEY=overridden\n").unwrap();
+
+        let value = OsString::from_vec(vec![0x66, 0x80]);
+
+        // SAFETY: test setup for a temporary env var.
+        unsafe { std::env::set_var("KEY", &value) };
+
+        let pairs = from_path(&path).unwrap();
+        assert_eq!(pairs[0].key, "KEY");
+        assert_eq!(std::env::var_os("KEY").unwrap(), value);
+
+        // SAFETY: test cleanup for a temporary env var.
+        unsafe { std::env::remove_var("KEY") };
+        std::fs::remove_file(path).unwrap();
     }
 }

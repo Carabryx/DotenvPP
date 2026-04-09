@@ -41,19 +41,7 @@ jobs:
         id: release_meta
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         run: |
-          set -euo pipefail
-          PACKAGE_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('Cargo.toml', 'rb'))['workspace']['package']['version'])")
-          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
-
-          echo "Cargo.toml version: $PACKAGE_VERSION"
-          echo "Git tag version: $TAG_VERSION"
-
-          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
-            echo "⚠️ Tag v$TAG_VERSION does not match Cargo.toml workspace version $PACKAGE_VERSION"
-            echo "⚠️ Using Cargo.toml version as the authoritative version"
-          fi
-
-          echo "version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+          bash scripts/resolve_release_version.sh "$GITHUB_REF"
 
       - name: Prepare release docs for publish
         id: prepare_docs
@@ -64,59 +52,7 @@ jobs:
           TODAY=$(date +'%Y-%m-%d')
           export VERSION TODAY
 
-          python3 - <<'PY'
-          from pathlib import Path
-          import os
-          import re
-          
-          version = os.environ["VERSION"]
-          today = os.environ["TODAY"]
-          
-          readme = Path("README.md")
-          readme_text = readme.read_text()
-          # Only update the badge for stable releases (no pre-release suffix)
-          if "-" not in version:
-              readme_text = re.sub(
-                  r'<img src="https://img\.shields\.io/badge/release-v[^"]+" alt="Release [^"]+" />',
-                  f'<img src="https://img.shields.io/badge/release-v{version}-171717" alt="Release {version}" />',
-                  readme_text,
-                  count=1,
-              )
-          readme.write_text(readme_text)
-          
-          changelog = Path("CHANGELOG.md")
-          changelog_text = changelog.read_text()
-          section = f"## [{version}] - {today}"
-          version_link = f"[{version}]: https://github.com/Carabryx/DotenvPP/releases/tag/v{version}"
-          unreleased_link = f"[Unreleased]: https://github.com/Carabryx/DotenvPP/compare/v{version}...HEAD"
-          
-          if section not in changelog_text:
-              marker = "## [Unreleased]\n"
-              if marker not in changelog_text:
-                  raise SystemExit("CHANGELOG.md is missing ## [Unreleased]")
-          
-              changelog_text = changelog_text.replace(marker, marker + "\n" + section + "\n\n", 1)
-          
-          if unreleased_link not in changelog_text:
-              changelog_text = re.sub(
-                  r'^\[Unreleased\]: .*$',
-                  unreleased_link,
-                  changelog_text,
-                  count=1,
-                  flags=re.M,
-              )
-          
-          if version_link not in changelog_text:
-              changelog_text = re.sub(
-                  r'^\[Unreleased\]: .*$',
-                  lambda match: f"{match.group(0)}\n{version_link}",
-                  changelog_text,
-                  count=1,
-                  flags=re.M,
-              )
-          
-          changelog.write_text(changelog_text)
-          PY
+          bash scripts/update_release_docs.sh
 
           if git diff --quiet README.md CHANGELOG.md; then
             echo "Release docs already match version $VERSION"
@@ -208,59 +144,7 @@ jobs:
           git checkout main
           git pull origin main --rebase
 
-          python3 - <<'PY'
-          from pathlib import Path
-          import os
-          import re
-          
-          version = os.environ["VERSION"]
-          today = os.environ["TODAY"]
-          
-          readme = Path("README.md")
-          readme_text = readme.read_text()
-          # Only update the badge for stable releases (no pre-release suffix)
-          if "-" not in version:
-              readme_text = re.sub(
-                  r'<img src="https://img\.shields\.io/badge/release-v[^"]+" alt="Release [^"]+" />',
-                  f'<img src="https://img.shields.io/badge/release-v{version}-171717" alt="Release {version}" />',
-                  readme_text,
-                  count=1,
-              )
-          readme.write_text(readme_text)
-          
-          changelog = Path("CHANGELOG.md")
-          changelog_text = changelog.read_text()
-          section = f"## [{version}] - {today}"
-          version_link = f"[{version}]: https://github.com/Carabryx/DotenvPP/releases/tag/v{version}"
-          unreleased_link = f"[Unreleased]: https://github.com/Carabryx/DotenvPP/compare/v{version}...HEAD"
-          
-          if section not in changelog_text:
-              marker = "## [Unreleased]\n"
-              if marker not in changelog_text:
-                  raise SystemExit("CHANGELOG.md is missing ## [Unreleased]")
-          
-              changelog_text = changelog_text.replace(marker, marker + "\n" + section + "\n\n", 1)
-          
-          if unreleased_link not in changelog_text:
-              changelog_text = re.sub(
-                  r'^\[Unreleased\]: .*$',
-                  unreleased_link,
-                  changelog_text,
-                  count=1,
-                  flags=re.M,
-              )
-          
-          if version_link not in changelog_text:
-              changelog_text = re.sub(
-                  r'^\[Unreleased\]: .*$',
-                  lambda match: f"{match.group(0)}\n{version_link}",
-                  changelog_text,
-                  count=1,
-                  flags=re.M,
-              )
-          
-          changelog.write_text(changelog_text)
-          PY
+          bash scripts/update_release_docs.sh
 
           if git diff --quiet README.md CHANGELOG.md; then
             echo "Release docs already up to date on main"

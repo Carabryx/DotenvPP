@@ -1,6 +1,8 @@
 use clap::{Parser, Subcommand};
+#[cfg(unix)]
+use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
-use std::process::{self, Command};
+use std::process::{self, Command, ExitStatus};
 
 /// DotenvPP CLI — next-generation environment configuration.
 #[derive(Parser)]
@@ -73,7 +75,20 @@ fn main() {
                 process::exit(1);
             });
 
-            process::exit(status.code().unwrap_or(1));
+            exit_from_status(status);
         }
     }
+}
+
+fn exit_from_status(status: ExitStatus) -> ! {
+    if let Some(code) = status.code() {
+        process::exit(code);
+    }
+
+    #[cfg(unix)]
+    if let Some(signal) = status.signal() {
+        process::exit(128 + signal);
+    }
+
+    process::exit(1);
 }
