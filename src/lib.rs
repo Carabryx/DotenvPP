@@ -126,6 +126,12 @@ pub fn load_override() -> Result<Vec<EnvPair>> {
 ///
 /// **Existing** environment variables are NOT overridden.
 ///
+/// # Safety
+///
+/// This function mutates the process environment via
+/// [`std::env::set_var`]. Call it early in program startup, before
+/// spawning threads, to avoid races with concurrent environment access.
+///
 /// # Examples
 ///
 /// ```rust,no_run
@@ -147,6 +153,12 @@ pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Vec<EnvPair>> {
 }
 
 /// Load from a specific path, **overriding** existing env vars.
+///
+/// # Safety
+///
+/// This function mutates the process environment via
+/// [`std::env::set_var`]. Call it early in program startup, before
+/// spawning threads, to avoid races with concurrent environment access.
 pub fn from_path_override<P: AsRef<Path>>(path: P) -> Result<Vec<EnvPair>> {
     let content = fs::read_to_string(path)?;
     let pairs = dotenvpp_parser::parse(&content)?;
@@ -255,7 +267,7 @@ mod tests {
 
     #[test]
     fn test_version() {
-        assert_eq!(version(), "0.0.2");
+        assert_eq!(version(), env!("CARGO_PKG_VERSION"));
     }
 
     #[test]

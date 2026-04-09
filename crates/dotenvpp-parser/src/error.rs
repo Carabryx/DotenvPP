@@ -1,6 +1,10 @@
 //! Error types for the DotenvPP parser.
 
 use core::fmt;
+#[cfg(not(feature = "std"))]
+use alloc::string::String;
+#[cfg(feature = "std")]
+use std::string::String;
 
 /// Errors that can occur while parsing `.env` content.
 #[derive(Debug, Clone, PartialEq, Eq)]

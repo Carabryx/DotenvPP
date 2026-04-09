@@ -20,6 +20,10 @@ fn test_from_read_with_comments() {
     let input = b"# comment\nKEY=value\n\n# another\nNAME=\"test\"";
     let pairs = dotenvpp::from_read(Cursor::new(input)).unwrap();
     assert_eq!(pairs.len(), 2);
+    assert_eq!(pairs[0].key, "KEY");
+    assert_eq!(pairs[0].value, "value");
+    assert_eq!(pairs[1].key, "NAME");
+    assert_eq!(pairs[1].value, "test");
 }
 
 #[test]
@@ -43,6 +47,12 @@ EMPTY=
 "#;
     let pairs = dotenvpp::from_read(Cursor::new(input)).unwrap();
     assert_eq!(pairs.len(), 6);
+    assert_eq!(pairs[0].key, "APP_NAME");
+    assert_eq!(pairs[0].value, "dotenvpp");
+    assert_eq!(pairs[2].key, "DB_URL");
+    assert_eq!(pairs[2].value, "postgres://user:pass@localhost/db");
+    assert_eq!(pairs[5].key, "EMPTY");
+    assert_eq!(pairs[5].value, "");
 }
 
 #[test]
@@ -68,9 +78,19 @@ fn test_version_format() {
 
 #[test]
 fn test_var_not_present() {
+    let key = format!(
+        "DOTENVPP_TEST_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+
     // Requesting a var that doesn't exist should give NotPresent error.
-    let err = dotenvpp::var("DOTENVPP_THIS_KEY_SHOULD_NOT_EXIST");
+    let err = dotenvpp::var(&key);
     assert!(err.is_err());
     let msg = format!("{}", err.unwrap_err());
     assert!(msg.contains("not found"));
+    assert!(msg.contains(&key));
 }

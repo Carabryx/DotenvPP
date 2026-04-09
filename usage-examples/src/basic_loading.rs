@@ -7,8 +7,8 @@ pub fn run() -> Result<(), dotenvpp::Error> {
     println!("│  Example 1: Basic .env Loading       │");
     println!("└─────────────────────────────────────┘");
 
-    // Load the .env file.
-    let pairs = dotenvpp::from_path(".env")?;
+    // Load the default .env file from the current working directory.
+    let pairs = dotenvpp::load()?;
 
     println!("  📋 Loaded {} variables from .env:\n", pairs.len());
 

@@ -22,5 +22,5 @@ cargo run
 ## Notes
 
 - The `.env` files are **tracked in git** — they contain demo data, not real secrets
-- This directory is excluded from workspace and crates.io publishing
+- This directory is included as a workspace member, but it is not published to crates.io
 - Depends on `dotenvpp` via `path = ".."`

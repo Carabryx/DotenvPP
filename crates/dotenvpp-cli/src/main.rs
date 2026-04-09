@@ -59,11 +59,6 @@ fn main() {
             file,
             command,
         } => {
-            if command.is_empty() {
-                eprintln!("❌ No command specified");
-                process::exit(1);
-            }
-
             // Load env vars (do not override existing).
             if let Err(err) = dotenvpp::from_path(&file) {
                 eprintln!("❌ Failed to load {}: {err}", file.display());
