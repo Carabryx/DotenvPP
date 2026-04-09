@@ -6,6 +6,11 @@ set -euo pipefail
 : "${TODAY:?TODAY must be set}"
 
 if [[ "$VERSION" != *-* ]]; then
+  if ! grep -qE '<a href="https://github\.com/Carabryx/DotenvPP/releases(/latest)?"><img src="https://img\.shields\.io/[^"]+" alt="[^"]*" /></a>' README.md; then
+    echo "❌ Expected README badge pattern not found"
+    exit 1
+  fi
+
   perl -0pi -e '
     s{<a href="https://github\.com/Carabryx/DotenvPP/releases(?:/latest)?"><img src="https://img\.shields\.io/[^"]+" alt="[^"]*" /></a>}{<a href="https://github.com/Carabryx/DotenvPP/releases/latest"><img src="https://img.shields.io/github/v/release/Carabryx/DotenvPP?label=release&color=171717" alt="Latest release" /></a>}
   ' README.md
@@ -21,7 +26,7 @@ perl -0pi -e '
 
   die "CHANGELOG.md is missing ## [Unreleased]\n" unless index($_, $marker) >= 0;
 
-  if (index($_, $section) < 0) {
+  if ($_ !~ /^## \[\Q$version\E\]/m) {
     s/\Q$marker\E/${marker}\n${section}\n\n/ or die "Failed to insert release section\n";
   }
 

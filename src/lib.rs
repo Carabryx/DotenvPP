@@ -28,6 +28,7 @@
 //! | [`from_read()`] | Parse from any `impl Read` |
 //! | [`var()`] | Get a single env var |
 //! | [`vars()`] | Iterate all env vars |
+//! | [`vars_os()`] | Iterate env vars without Unicode conversion |
 
 use std::collections::HashSet;
 use std::env;
@@ -240,6 +241,12 @@ pub fn var<K: AsRef<OsStr>>(key: K) -> Result<String> {
 ///
 /// Snapshot of the process environment at the time of invocation.
 ///
+/// # Panics
+///
+/// Panics if any environment variable key or value is not valid
+/// Unicode. Use [`vars_os()`] if you need to preserve non-Unicode
+/// entries.
+///
 /// # Examples
 ///
 /// ```rust,no_run
@@ -250,6 +257,14 @@ pub fn var<K: AsRef<OsStr>>(key: K) -> Result<String> {
 /// ```
 pub fn vars() -> env::Vars {
     env::vars()
+}
+
+/// Returns an iterator over all environment variables as
+/// `(OsString, OsString)` pairs.
+///
+/// Snapshot of the process environment at the time of invocation.
+pub fn vars_os() -> env::VarsOs {
+    env::vars_os()
 }
 
 // ── Meta ────────────────────────────────────────────────────
@@ -266,6 +281,14 @@ mod tests {
     #![allow(clippy::unwrap_used)]
 
     use super::*;
+    #[cfg(not(windows))]
+    use std::sync::{Mutex, OnceLock};
+
+    #[cfg(not(windows))]
+    fn env_test_lock() -> &'static Mutex<()> {
+        static ENV_TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        ENV_TEST_LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[test]
     fn test_version() {
@@ -307,23 +330,36 @@ mod tests {
         use std::os::unix::ffi::OsStringExt;
         use std::time::{SystemTime, UNIX_EPOCH};
 
-        let path = std::env::temp_dir().join(format!(
-            "dotenvpp-preserve-{}.env",
-            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
-        ));
-        std::fs::write(&path, "KEY=overridden\n").unwrap();
+        struct TestCleanup {
+            key: String,
+            path: std::path::PathBuf,
+        }
+
+        impl Drop for TestCleanup {
+            fn drop(&mut self) {
+                // SAFETY: test cleanup for a temporary env var.
+                unsafe { std::env::remove_var(&self.key) };
+                let _ = std::fs::remove_file(&self.path);
+            }
+        }
+
+        let _guard = env_test_lock().lock().unwrap();
+        let unique = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let key = format!("DOTENVPP_NON_UNICODE_KEY_{unique}");
+        let path = std::env::temp_dir().join(format!("dotenvpp-preserve-{}.env", unique));
+        std::fs::write(&path, format!("{key}=overridden\n")).unwrap();
+        let _cleanup = TestCleanup {
+            key: key.clone(),
+            path: path.clone(),
+        };
 
         let value = OsString::from_vec(vec![0x66, 0x80]);
 
         // SAFETY: test setup for a temporary env var.
-        unsafe { std::env::set_var("KEY", &value) };
+        unsafe { std::env::set_var(&key, &value) };
 
         let pairs = from_path(&path).unwrap();
-        assert_eq!(pairs[0].key, "KEY");
-        assert_eq!(std::env::var_os("KEY").unwrap(), value);
-
-        // SAFETY: test cleanup for a temporary env var.
-        unsafe { std::env::remove_var("KEY") };
-        std::fs::remove_file(path).unwrap();
+        assert_eq!(pairs[0].key, key.as_str());
+        assert_eq!(std::env::var_os(&key).unwrap(), value);
     }
 }

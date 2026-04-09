@@ -2,10 +2,19 @@
 
 set -euo pipefail
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd -- "$script_dir/.." && pwd)"
+cargo_toml="$repo_root/Cargo.toml"
+
 tag_ref="${1:-${GITHUB_REF:-}}"
 
 if [[ -z "$tag_ref" ]]; then
   echo "❌ GITHUB_REF must be set or passed as the first argument"
+  exit 1
+fi
+
+if [[ "$tag_ref" != refs/tags/v* ]]; then
+  echo "❌ Expected tag ref starting with refs/tags/v, got: $tag_ref"
   exit 1
 fi
 
@@ -18,7 +27,7 @@ package_version="$(
       print $3
       exit
     }
-  ' Cargo.toml
+  ' "$cargo_toml"
 )"
 tag_version="${tag_ref#refs/tags/v}"
 
