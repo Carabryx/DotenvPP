@@ -22,7 +22,7 @@
 - [x] Publish initial crate structure to crates.io (reserve names)
 - [x] Add release docs (`CHANGELOG.md` and `docs/INTRODUCTION.md`)
 
-**Exit Criteria**: Phase 0 is complete and ready to publish as `0.0.2`.
+**Exit Criteria**: Phase 0 was completed and published as `0.0.2`.
 
 ---
 
@@ -97,6 +97,7 @@
 - [ ] Verify both backends produce compatible encrypted output
 - [ ] Security audit checklist
 - [ ] Optional: pluggable KMS feature flags (AWS KMS, GCP KMS, Azure Key Vault)
+- [ ] Add fuzz testing for `dotenvpp_parser::parse()`
 
 ---
 
@@ -164,6 +165,7 @@
 - [ ] Test in edge runtimes (Cloudflare Workers, Vercel Edge)
 - [ ] Optimize WASM binary size (target < 200KB gzipped)
 - [ ] Create WASI target for standalone runtime
+- [ ] Increase fuzz testing for `dotenvpp_parser::parse()`
 
 **Exit Criteria**: `npm install @dotenvpp/wasm` works and can validate schemas in browser.
 

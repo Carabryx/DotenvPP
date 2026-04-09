@@ -18,10 +18,6 @@ Thumbs.db
 # Usage examples build artifacts
 usage-examples/target/
 
-# Test Environment Variables
-!.env
-!.env.production
-!.env.development
-!.env.test
+# Environment files — ignore by default, allow tracked demo/example files
+.env*
 !.env.example
-!.env.local

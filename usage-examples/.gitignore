@@ -2,10 +2,8 @@
 /target/
 Cargo.lock
 
-# Test Environment Variables
+# Environment files — ignore by default, allow tracked demo files
+.env*
 !.env
 !.env.production
-!.env.development
-!.env.test
 !.env.example
-!.env.local

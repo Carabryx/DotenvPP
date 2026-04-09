@@ -13,8 +13,8 @@ homepage = "https://github.com/Carabryx/DotenvPP"
 
 # ── Shared dependency versions ──
 [workspace.dependencies]
-dotenvpp        = { path = "." }
-dotenvpp-parser = { path = "crates/dotenvpp-parser" }
+dotenvpp        = { path = ".", version = "=0.0.2" }
+dotenvpp-parser = { path = "crates/dotenvpp-parser", version = "=0.0.2" }
 thiserror       = { version = "2", default-features = false }
 clap            = { version = "4", features = ["derive"] }
 criterion       = { version = "0.8", features = ["html_reports"] }

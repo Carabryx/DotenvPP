@@ -96,4 +96,28 @@ mod tests {
         assert!(!msg.contains("API_KEY"));
         assert!(!msg.contains("abc123"));
     }
+
+    #[test]
+    fn display_invalid_key() {
+        let err = ParseError::InvalidKey {
+            line: 4,
+            key: "BAD-KEY".into(),
+        };
+        let msg = format!("{err}");
+        assert!(msg.contains("line 4"));
+        assert!(msg.contains("BAD-KEY"));
+        assert!(msg.contains("underscores"));
+    }
+
+    #[test]
+    fn display_unterminated_quote() {
+        let err = ParseError::UnterminatedQuote {
+            line: 7,
+            quote: '"',
+        };
+        let msg = format!("{err}");
+        assert!(msg.contains("line 7"));
+        assert!(msg.contains("unterminated"));
+        assert!(msg.contains('"'));
+    }
 }

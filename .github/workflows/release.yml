@@ -43,6 +43,10 @@ jobs:
         run: |
           bash scripts/resolve_release_version.sh "$GITHUB_REF"
 
+      - name: Check workspace dependency versions
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        run: bash scripts/check_workspace_versions.sh
+
       - name: Prepare release docs for publish
         id: prepare_docs
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')

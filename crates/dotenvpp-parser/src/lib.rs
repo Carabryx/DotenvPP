@@ -33,7 +33,7 @@
 
 extern crate alloc;
 
-pub mod error;
+mod error;
 mod parser;
 
 pub use error::ParseError;

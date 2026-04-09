@@ -12,6 +12,7 @@ mod double_quotes;
 mod edge_cases;
 mod escapes;
 mod export;
+mod internals;
 mod mixed;
 mod multiline;
 mod single_quotes;

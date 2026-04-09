@@ -94,3 +94,23 @@ fn test_var_not_present() {
     assert!(msg.contains("not found"));
     assert!(msg.contains(&key));
 }
+
+#[cfg(not(windows))]
+#[test]
+fn test_var_not_unicode() {
+    use std::ffi::OsString;
+    use std::os::unix::ffi::OsStringExt;
+
+    let key = "DOTENVPP_INVALID_UNICODE";
+    let value = OsString::from_vec(vec![0x66, 0x80]);
+
+    // SAFETY: test setup for a unique env var key.
+    unsafe { std::env::set_var(key, &value) };
+
+    let err = dotenvpp::var(key).unwrap_err();
+    let msg = format!("{err}");
+    assert!(msg.contains("invalid unicode"));
+
+    // SAFETY: test cleanup for a unique env var key.
+    unsafe { std::env::remove_var(key) };
+}
