@@ -224,7 +224,8 @@ mod tests {
     #[test]
     fn load_and_run_returns_execute_error() {
         let _guard = test_lock();
-        let file = TempEnvFile::new("A=1\n");
+        let key = "DOTENVPP_CLI_EXEC_ERR";
+        let file = TempEnvFile::new(&format!("{key}=1\n"));
         let err = load_and_run(&file.path, &["definitely-not-a-real-command".into()]).unwrap_err();
 
         assert!(matches!(
@@ -234,5 +235,8 @@ mod tests {
                 ..
             } if program == "definitely-not-a-real-command"
         ));
+
+        // SAFETY: test cleanup for an isolated process env key.
+        unsafe { std::env::remove_var(key) };
     }
 }

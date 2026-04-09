@@ -479,8 +479,21 @@ mod tests {
 
     #[test]
     fn test_load_and_load_override_use_dotenv_in_current_dir() {
+        struct CwdRestore {
+            orig: std::path::PathBuf,
+        }
+
+        impl Drop for CwdRestore {
+            fn drop(&mut self) {
+                let _ = env::set_current_dir(&self.orig);
+            }
+        }
+
         let _guard = test_lock();
         let original_dir = env::current_dir().unwrap();
+        let _cwd_guard = CwdRestore {
+            orig: original_dir,
+        };
         let temp_dir = TempEnvPath::directory();
         let env_path = temp_dir.path.join(".env");
         let key = "DOTENVPP_LIB_LOAD";
@@ -498,8 +511,6 @@ mod tests {
         let loaded = load_override().unwrap();
         assert_eq!(loaded.len(), 1);
         assert_eq!(var(key).unwrap(), "override_value");
-
-        env::set_current_dir(original_dir).unwrap();
 
         // SAFETY: test cleanup for a unique env var key.
         unsafe { env::remove_var(key) };
