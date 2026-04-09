@@ -1,8 +1,8 @@
 //! Error types for the DotenvPP parser.
 
-use core::fmt;
 #[cfg(not(feature = "std"))]
 use alloc::string::String;
+use core::fmt;
 #[cfg(feature = "std")]
 use std::string::String;
 
