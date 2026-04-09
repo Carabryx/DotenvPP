@@ -10,7 +10,9 @@ Phase 0 ships the parser foundation:
 - Comments, blank lines, and `export` prefixes
 - Single-quoted, double-quoted, and unquoted values
 - Multiline quoted values, BOM handling, and common escape sequences
-- `dotenvpp` facade helpers and CLI checks
+- `dotenvpp` facade helpers and Phase 0 CLI commands (`check`, `run`)
+
+Roadmap items described elsewhere in the repository remain design targets for future phases; the currently shipped API is the parser/loading surface above.
 
 ## Why This Direction
 
