@@ -1,0 +1,203 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Run all tests
+        run: |
+          set -euo pipefail
+          cargo test --all-features --all-targets --workspace --verbose
+          cargo clippy --workspace --all-features --all-targets -- -D warnings
+          cargo fmt -- --check
+
+      - name: Build documentation
+        run: cargo doc --all-features --no-deps
+
+      - name: Security audit
+        run: |
+          set -euo pipefail
+          cargo install cargo-audit
+          cargo audit
+
+      - name: Resolve release version
+        id: release_meta
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        run: |
+          bash scripts/resolve_release_version.sh "$GITHUB_REF"
+
+      - name: Prepare release docs for publish
+        id: prepare_docs
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.release_meta.outputs.version }}"
+          TODAY=$(date +'%Y-%m-%d')
+          export VERSION TODAY
+
+          bash scripts/update_release_docs.sh
+
+          if git diff --quiet README.md CHANGELOG.md; then
+            echo "Release docs already match version $VERSION"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Release docs updated in working tree before publish"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff -- README.md CHANGELOG.md
+          fi
+
+      # Publish workspace crates in dependency order
+      - name: Publish dotenvpp-parser to crates.io
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish -p dotenvpp-parser --all-features
+
+      - name: Publish dotenvpp to crates.io
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          set -euo pipefail
+          attempt=1
+          delay=30
+          max_attempts=5
+
+          until cargo publish -p dotenvpp --all-features; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "❌ Failed to publish dotenvpp after $attempt attempts"
+              exit 1
+            fi
+
+            echo "⏳ Publish attempt $attempt failed, retrying in ${delay}s..."
+            sleep "$delay"
+            attempt=$((attempt + 1))
+            delay=$((delay * 2))
+          done
+
+      - name: Publish dotenvpp-cli to crates.io
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          set -euo pipefail
+          attempt=1
+          delay=30
+          max_attempts=5
+
+          until cargo publish -p dotenvpp-cli --all-features; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "❌ Failed to publish dotenvpp-cli after $attempt attempts"
+              exit 1
+            fi
+
+            echo "⏳ Publish attempt $attempt failed, retrying in ${delay}s..."
+            sleep "$delay"
+            attempt=$((attempt + 1))
+            delay=$((delay * 2))
+          done
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            Cargo.toml
+            README.md
+            CHANGELOG.md
+            LICENSE-MIT
+            LICENSE-APACHE
+
+      - name: Persist release docs on main
+        id: sync_docs_main
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.release_meta.outputs.version }}"
+          TODAY=$(date +'%Y-%m-%d')
+          export VERSION TODAY
+
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+          # Discard pre-publish release-doc edits before switching branches
+          git checkout -- README.md CHANGELOG.md
+
+          git checkout main
+          git pull origin main --rebase
+
+          bash scripts/update_release_docs.sh
+
+          if git diff --quiet README.md CHANGELOG.md; then
+            echo "Release docs already up to date on main"
+            echo "commit_sha=" >> "$GITHUB_OUTPUT"
+          else
+            git commit -am "docs: update readme and changelog for version $VERSION [skip ci]"
+            git push origin main
+
+            COMMIT_SHA=$(git rev-parse HEAD)
+            echo "commit_sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
+            echo "Pushed release docs update to main ($COMMIT_SHA)"
+          fi
+
+      - name: Sync release docs update to dev
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && steps.sync_docs_main.outputs.commit_sha != ''
+        run: |
+          set -euo pipefail
+          COMMIT_SHA="${{ steps.sync_docs_main.outputs.commit_sha }}"
+          echo "Syncing release docs commit $COMMIT_SHA to dev..."
+
+          git checkout dev
+          git pull origin dev --rebase
+
+          # Check if commit is already on dev
+          if git merge-base --is-ancestor "$COMMIT_SHA" HEAD; then
+            echo "ℹ️ SKIPPED: Commit $COMMIT_SHA is already on dev branch"
+            exit 0
+          fi
+
+          # Attempt cherry-pick
+          echo "🍒 Cherry-picking commit $COMMIT_SHA..."
+          if git cherry-pick "$COMMIT_SHA" 2>&1; then
+            git push origin dev
+            echo "✅ SUCCESS: Cherry-picked and pushed release docs update to dev"
+          else
+            PICK_EXIT=$?
+            # Check if cherry-pick produced an empty commit
+            if git diff --cached --quiet 2>/dev/null; then
+              echo "ℹ️ Cherry-pick is empty — change already present on dev"
+              git cherry-pick --abort 2>/dev/null || true
+              exit 0
+            fi
+
+            # Real conflict
+            echo "⚠️ Cherry-pick failed with exit code $PICK_EXIT"
+            git cherry-pick --abort 2>/dev/null || true
+            git reset --hard HEAD
+
+            echo "❌ CONFLICT: Could not cherry-pick release docs update to dev"
+            echo "   Manual resolution required:"
+            echo "     git checkout dev"
+            echo "     git cherry-pick $COMMIT_SHA"
+            echo "     # resolve conflicts"
+            echo "     git push origin dev"
+            exit 1
+          fi

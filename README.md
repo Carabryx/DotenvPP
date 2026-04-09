@@ -7,6 +7,15 @@
 </p>
 
 <p align="center">
+  <a href="https://crates.io/crates/dotenvpp"><img src="https://img.shields.io/crates/v/dotenvpp?color=171717" alt="Crates.io Version" /></a>
+  <a href="https://crates.io/crates/dotenvpp"><img src="https://img.shields.io/crates/d/dotenvpp?color=171717" alt="Crates.io Downloads" /></a>
+  <a href="https://docs.rs/dotenvpp"><img src="https://img.shields.io/docsrs/dotenvpp?color=171717" alt="docs.rs" /></a>
+  <a href="https://github.com/Carabryx/DotenvPP/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/Carabryx/DotenvPP/ci.yml?label=CI&color=171717" alt="CI" /></a>
+  <a href="https://github.com/Carabryx/DotenvPP/releases/latest"><img src="https://img.shields.io/github/v/release/Carabryx/DotenvPP?label=release&color=171717" alt="Latest release" /></a>
+  <a href="https://coderabbit.ai"><img src="https://img.shields.io/coderabbit/prs/github/Carabryx/DotenvPP?utm_source=oss&utm_medium=github&utm_campaign=Carabryx%2FDotenvPP&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews" alt="CodeRabbit Pull Request Reviews" /></a>
+</p>
+
+<p align="center">
   <a href="#why">Why?</a> •
   <a href="#features">Features</a> •
   <a href="#quick-start">Quick Start</a> •
@@ -208,8 +217,8 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full technical vision.
 
 | Phase | Description | Status |
 |---|---|---|
-| 0 | Foundation — Standard `.env` parsing | 🔜 Next |
-| 1 | Interpolation & environment layering | 📋 Planned |
+| 0 | Foundation — Standard `.env` parsing | ✅ Complete |
+| 1 | Interpolation & environment layering | 🔜 Next |
 | 2 | Schema & type system | 📋 Planned |
 | 3 | Encryption | 📋 Planned |
 | 4 | Expression language | 📋 Planned |

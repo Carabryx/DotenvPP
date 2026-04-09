@@ -2,7 +2,7 @@
 
 > **Status**: Pre-implementation design document
 > **Language**: Rust | **Target**: Native + WASM
-> **License**: TBD (considering AGPL-3.0 or MIT)
+> **License**: MIT OR Apache-2.0
 
 ---
 

@@ -1,14 +1,59 @@
+[workspace]
+members = ["crates/*", "usage-examples"]
+resolver = "2"
+
+# ── Shared metadata ── bump version HERE only ──
+[workspace.package]
+version = "0.0.2"
+edition = "2021"
+authors = ["Ariaj Sarkar <ariajsarkar@gmail.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Carabryx/DotenvPP"
+homepage = "https://github.com/Carabryx/DotenvPP"
+
+# ── Shared dependency versions ──
+[workspace.dependencies]
+dotenvpp        = { path = "." }
+dotenvpp-parser = { path = "crates/dotenvpp-parser" }
+thiserror       = { version = "2", default-features = false }
+clap            = { version = "4", features = ["derive"] }
+criterion       = { version = "0.8", features = ["html_reports"] }
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+
+# ── Facade crate (root package) ──
 [package]
 name = "dotenvpp"
-version = "0.0.1"
-edition = "2021"
-description = "Dotenv++: Next-generation environment configuration with typed schemas, encryption, expressions, policies, and WASM support. Written in Rust."
-license = "MIT"
-repository = "https://github.com/AriajSarkar/DotenvPP"
-homepage = "https://github.com/AriajSarkar/DotenvPP"
-documentation = "https://docs.rs/dotenvpp"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "From-scratch .env parsing and loading toolkit in Rust."
 readme = "README.md"
 keywords = ["dotenv", "env", "config", "environment", "secrets"]
 categories = ["config", "development-tools"]
+exclude = [
+    "usage-examples/",
+    ".github/",
+    "target/",
+    "docs/",
+    "rustfmt.toml",
+]
 
 [dependencies]
+dotenvpp-parser = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[lints]
+workspace = true
+
+[[bench]]
+name = "parser_benchmark"
+harness = false
