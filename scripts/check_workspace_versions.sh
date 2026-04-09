@@ -51,7 +51,7 @@ while IFS= read -r line; do
   else
     echo "✅ $crate_name: $dep_version"
   fi
-done < <(grep -E 'path\s*=' "$cargo_toml" | grep -v '^\s*#')
+done < <(awk '/^\[workspace\.dependencies\]/{p=1;next} /^\[/{p=0} p' "$cargo_toml" | grep -E 'path\s*=' | grep -v '^\s*#')
 
 if [[ "$errors" -gt 0 ]]; then
   echo ""

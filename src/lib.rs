@@ -327,6 +327,33 @@ mod tests {
         }
     }
 
+    /// RAII guard that restores (or removes) an env var on drop.
+    /// Ensures test env mutations are cleaned up even on panic.
+    struct TempEnvVar {
+        key: String,
+        prev: Option<std::ffi::OsString>,
+    }
+
+    impl TempEnvVar {
+        fn new(key: &str) -> Self {
+            let prev = env::var_os(key);
+            Self {
+                key: key.to_owned(),
+                prev,
+            }
+        }
+    }
+
+    impl Drop for TempEnvVar {
+        fn drop(&mut self) {
+            match &self.prev {
+                // SAFETY: restoring env to its previous state during test cleanup.
+                Some(val) => unsafe { env::set_var(&self.key, val) },
+                None => unsafe { env::remove_var(&self.key) },
+            }
+        }
+    }
+
     #[test]
     fn test_version() {
         assert_eq!(version(), env!("CARGO_PKG_VERSION"));
@@ -368,6 +395,7 @@ mod tests {
 
         let _guard = test_lock();
         let key = "DOTENVPP_NON_UNICODE_KEY";
+        let _env_guard = TempEnvVar::new(key);
         let file = TempEnvPath::file("non-unicode.env", &format!("{key}=overridden\n"));
 
         let value = OsString::from_vec(vec![0x66, 0x80]);
@@ -378,9 +406,6 @@ mod tests {
         let pairs = from_path(&file.path).unwrap();
         assert_eq!(pairs[0].key, key);
         assert_eq!(std::env::var_os(key).unwrap(), value);
-
-        // SAFETY: test cleanup for a temporary env var.
-        unsafe { std::env::remove_var(key) };
     }
 
     #[test]
@@ -416,9 +441,10 @@ mod tests {
     fn test_from_path_sets_missing_vars_only() {
         let _guard = test_lock();
         let key = "DOTENVPP_LIB_FROM_PATH";
+        let _env_guard = TempEnvVar::new(key);
         let file = TempEnvPath::file("from-path.env", &format!("{key}=from_file\n"));
 
-        // SAFETY: test cleanup and setup for a unique env var key.
+        // SAFETY: test setup for a unique env var key.
         unsafe { env::remove_var(key) };
         let pairs = from_path(&file.path).unwrap();
         assert_eq!(pairs.len(), 1);
@@ -429,15 +455,13 @@ mod tests {
         let pairs = from_path(&file.path).unwrap();
         assert_eq!(pairs.len(), 1);
         assert_eq!(var(key).unwrap(), "existing");
-
-        // SAFETY: test cleanup for a unique env var key.
-        unsafe { env::remove_var(key) };
     }
 
     #[test]
     fn test_from_path_override_replaces_existing_vars() {
         let _guard = test_lock();
         let key = "DOTENVPP_LIB_OVERRIDE";
+        let _env_guard = TempEnvVar::new(key);
         let file = TempEnvPath::file("override.env", &format!("{key}=from_file\n"));
 
         // SAFETY: test setup for a unique env var key.
@@ -445,18 +469,16 @@ mod tests {
         let pairs = from_path_override(&file.path).unwrap();
         assert_eq!(pairs.len(), 1);
         assert_eq!(var(key).unwrap(), "from_file");
-
-        // SAFETY: test cleanup for a unique env var key.
-        unsafe { env::remove_var(key) };
     }
 
     #[test]
     fn test_from_path_iter_does_not_set_env() {
         let _guard = test_lock();
         let key = "DOTENVPP_LIB_ITER";
+        let _env_guard = TempEnvVar::new(key);
         let file = TempEnvPath::file("iter.env", &format!("{key}=preview_only\n"));
 
-        // SAFETY: test cleanup and setup for a unique env var key.
+        // SAFETY: test setup for a unique env var key.
         unsafe { env::remove_var(key) };
         let pairs: Vec<_> = from_path_iter(&file.path).unwrap().collect();
         assert_eq!(pairs.len(), 1);
@@ -467,14 +489,12 @@ mod tests {
     fn test_var_success_and_vars_snapshot() {
         let _guard = test_lock();
         let key = "DOTENVPP_LIB_VAR";
+        let _env_guard = TempEnvVar::new(key);
 
         // SAFETY: test setup for a unique env var key.
         unsafe { env::set_var(key, "visible") };
         assert_eq!(var(key).unwrap(), "visible");
         assert!(vars().any(|(name, value)| name == key && value == "visible"));
-
-        // SAFETY: test cleanup for a unique env var key.
-        unsafe { env::remove_var(key) };
     }
 
     #[test]
@@ -490,18 +510,21 @@ mod tests {
         }
 
         let _guard = test_lock();
+        let key = "DOTENVPP_LIB_LOAD";
+        let _env_guard = TempEnvVar::new(key);
+
+        // Declare temp_dir BEFORE cwd guard so cwd restores before temp_dir removal.
+        let temp_dir = TempEnvPath::directory();
         let original_dir = env::current_dir().unwrap();
         let _cwd_guard = CwdRestore {
             orig: original_dir,
         };
-        let temp_dir = TempEnvPath::directory();
-        let env_path = temp_dir.path.join(".env");
-        let key = "DOTENVPP_LIB_LOAD";
 
+        let env_path = temp_dir.path.join(".env");
         fs::write(&env_path, format!("{key}=from_dotenv\n")).unwrap();
         env::set_current_dir(&temp_dir.path).unwrap();
 
-        // SAFETY: test cleanup and setup for a unique env var key.
+        // SAFETY: test setup for a unique env var key.
         unsafe { env::remove_var(key) };
         let loaded = load().unwrap();
         assert_eq!(loaded.len(), 1);
@@ -511,8 +534,5 @@ mod tests {
         let loaded = load_override().unwrap();
         assert_eq!(loaded.len(), 1);
         assert_eq!(var(key).unwrap(), "override_value");
-
-        // SAFETY: test cleanup for a unique env var key.
-        unsafe { env::remove_var(key) };
     }
 }
