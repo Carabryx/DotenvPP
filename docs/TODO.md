@@ -22,7 +22,7 @@
 - [x] Publish initial crate structure to crates.io (reserve names)
 - [x] Add release docs (`CHANGELOG.md` and `docs/INTRODUCTION.md`)
 
-**Exit Criteria**: Phase 0 is complete and ready to publish as `0.0.2`.
+**Exit Criteria**: Phase 0 was completed and published as `0.0.2`.
 
 ---
 

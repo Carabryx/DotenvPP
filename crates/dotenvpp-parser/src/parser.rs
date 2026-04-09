@@ -238,7 +238,6 @@ where
                         // preserved; the next input line is appended as a
                         // literal newline.
                         result.push('\\');
-                        let _ = idx; // suppress unused warning
                     }
                 }
                 _ => {
