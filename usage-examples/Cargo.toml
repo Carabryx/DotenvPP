@@ -3,6 +3,35 @@ name = "dotenvpp-usage-examples"
 version = "0.1.0"
 edition = "2021"
 publish = false
+default-run = "dotenvpp-usage-examples"
 
 [dependencies]
 dotenvpp = { path = ".." }
+
+[[bin]]
+name = "basic-loading"
+path = "src/scenarios/01_basic_loading.rs"
+
+[[bin]]
+name = "from-read"
+path = "src/scenarios/02_from_read.rs"
+
+[[bin]]
+name = "interpolation"
+path = "src/scenarios/03_interpolation.rs"
+
+[[bin]]
+name = "layered-env"
+path = "src/scenarios/04_layered_env.rs"
+
+[[bin]]
+name = "production"
+path = "src/scenarios/05_production.rs"
+
+[[bin]]
+name = "preview-without-loading"
+path = "src/scenarios/06_preview_without_loading.rs"
+
+[[bin]]
+name = "error-handling"
+path = "src/scenarios/07_error_handling.rs"

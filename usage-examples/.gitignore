@@ -7,3 +7,5 @@ Cargo.lock
 !.env
 !.env.production
 !.env.example
+!.env.local
+!.env.production.local
