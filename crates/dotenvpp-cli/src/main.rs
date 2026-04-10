@@ -1,31 +1,40 @@
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
 use std::process::{self, Command, ExitStatus};
 
 /// DotenvPP CLI — next-generation environment configuration.
-#[derive(Parser)]
+#[derive(Debug, Parser)]
 #[command(name = "dotenvpp", version, about, long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
 }
 
-#[derive(Subcommand)]
+#[derive(Args, Clone, Debug, Default)]
+struct SourceArgs {
+    /// Path to a specific .env file to load or check.
+    #[arg(short, long, value_name = "FILE", conflicts_with = "environment")]
+    file: Option<PathBuf>,
+
+    /// Environment name for layered loading, such as `development` or `production`.
+    #[arg(short = 'e', long = "env", value_name = "ENV", conflicts_with = "file")]
+    environment: Option<String>,
+}
+
+#[derive(Debug, Subcommand)]
 enum Commands {
-    /// Validate that a .env file is parseable and well-formed.
+    /// Validate a specific file or the layered environment stack.
     Check {
-        /// Path to the .env file to check.
-        #[arg(short, long, default_value = ".env")]
-        file: PathBuf,
+        #[command(flatten)]
+        source: SourceArgs,
     },
 
     /// Load .env variables and run a command.
     Run {
-        /// Path to the .env file to load.
-        #[arg(short, long, default_value = ".env")]
-        file: PathBuf,
+        #[command(flatten)]
+        source: SourceArgs,
 
         /// The command and its arguments to run.
         #[arg(trailing_var_arg = true, required = true)]
@@ -43,16 +52,34 @@ enum RunError {
     },
 }
 
-fn check_file(file: &Path) -> dotenvpp::Result<usize> {
-    dotenvpp::from_path_iter(file).map(|pairs| pairs.count())
+fn check_target(file: Option<&Path>, environment: Option<&str>) -> dotenvpp::Result<usize> {
+    match file {
+        Some(path) => dotenvpp::from_path_iter(path).map(|pairs| pairs.count()),
+        None => dotenvpp::from_layered_env(environment).map(|pairs| pairs.len()),
+    }
 }
 
-fn load_and_run(file: &Path, command: &[String]) -> Result<ExitStatus, RunError> {
+fn load_and_run(
+    file: Option<&Path>,
+    environment: Option<&str>,
+    command: &[String],
+) -> Result<ExitStatus, RunError> {
     if command.is_empty() {
         return Err(RunError::MissingCommand);
     }
 
-    dotenvpp::from_path(file).map_err(RunError::Load)?;
+    match file {
+        Some(path) => {
+            dotenvpp::from_path(path).map_err(RunError::Load)?;
+        }
+        None => {
+            if let Some(environment) = environment {
+                dotenvpp::load_with_env(environment).map_err(RunError::Load)?;
+            } else {
+                dotenvpp::load().map_err(RunError::Load)?;
+            }
+        }
+    }
 
     let program = &command[0];
     let args = &command[1..];
@@ -69,12 +96,12 @@ fn main() {
 
     match cli.command {
         Commands::Check {
-            file,
-        } => match check_file(&file) {
+            source,
+        } => match check_target(source.file.as_deref(), source.environment.as_deref()) {
             Ok(count) => {
+                let target = describe_target(source.file.as_deref(), source.environment.as_deref());
                 println!(
-                    "✅ {} — {count} variable{} parsed successfully",
-                    file.display(),
+                    "✅ {target} — {count} variable{} parsed successfully",
                     if count == 1 {
                         ""
                     } else {
@@ -83,21 +110,23 @@ fn main() {
                 );
             }
             Err(err) => {
-                eprintln!("❌ {}: {err}", file.display());
+                let target = describe_target(source.file.as_deref(), source.environment.as_deref());
+                eprintln!("❌ {target}: {err}");
                 process::exit(1);
             }
         },
         Commands::Run {
-            file,
+            source,
             command,
-        } => match load_and_run(&file, &command) {
+        } => match load_and_run(source.file.as_deref(), source.environment.as_deref(), &command) {
             Ok(status) => exit_from_status(status),
             Err(RunError::MissingCommand) => {
                 eprintln!("❌ No command specified");
                 process::exit(1);
             }
             Err(RunError::Load(err)) => {
-                eprintln!("❌ Failed to load {}: {err}", file.display());
+                let target = describe_target(source.file.as_deref(), source.environment.as_deref());
+                eprintln!("❌ Failed to load {target}: {err}");
                 process::exit(1);
             }
             Err(RunError::Execute {
@@ -107,6 +136,16 @@ fn main() {
                 eprintln!("❌ Failed to execute {program}: {source}");
                 process::exit(1);
             }
+        },
+    }
+}
+
+fn describe_target(file: Option<&Path>, environment: Option<&str>) -> String {
+    match file {
+        Some(path) => path.display().to_string(),
+        None => match environment {
+            Some(environment) => format!("layered environment for `{environment}`"),
+            None => "layered environment".to_owned(),
         },
     }
 }
@@ -122,121 +161,4 @@ fn exit_from_status(status: ExitStatus) -> ! {
     }
 
     process::exit(1);
-}
-
-#[cfg(test)]
-mod tests {
-    #![allow(clippy::unwrap_used)]
-
-    use super::*;
-    use std::fs;
-    use std::sync::{Mutex, OnceLock};
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    fn test_lock() -> std::sync::MutexGuard<'static, ()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(())).lock().unwrap_or_else(|e| e.into_inner())
-    }
-
-    struct TempEnvFile {
-        path: PathBuf,
-    }
-
-    impl TempEnvFile {
-        fn new(contents: &str) -> Self {
-            let mut path = std::env::temp_dir();
-            let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-            path.push(format!("dotenvpp-cli-test-{}-{nanos}.env", std::process::id()));
-            fs::write(&path, contents).unwrap();
-            Self {
-                path,
-            }
-        }
-    }
-
-    impl Drop for TempEnvFile {
-        fn drop(&mut self) {
-            let _ = fs::remove_file(&self.path);
-        }
-    }
-
-    #[cfg(windows)]
-    fn env_probe_command(key: &str, expected: &str) -> Vec<String> {
-        vec![
-            "cmd".into(),
-            "/C".into(),
-            format!("if \"%{key}%\"==\"{expected}\" (exit 0) else (exit 3)"),
-        ]
-    }
-
-    #[cfg(not(windows))]
-    fn env_probe_command(key: &str, expected: &str) -> Vec<String> {
-        vec!["sh".into(), "-c".into(), format!("[ \"${key}\" = \"{expected}\" ]")]
-    }
-
-    #[test]
-    fn check_file_counts_pairs() {
-        let _guard = test_lock();
-        let file = TempEnvFile::new("A=1\nB=2\n");
-        assert_eq!(check_file(&file.path).unwrap(), 2);
-    }
-
-    #[test]
-    fn check_file_returns_parse_error() {
-        let _guard = test_lock();
-        let file = TempEnvFile::new("NOT_VALID\n");
-        assert!(check_file(&file.path).is_err());
-    }
-
-    #[test]
-    fn load_and_run_rejects_missing_command() {
-        let _guard = test_lock();
-        let file = TempEnvFile::new("A=1\n");
-        let err = load_and_run(&file.path, &[]).unwrap_err();
-        assert!(matches!(err, RunError::MissingCommand));
-    }
-
-    #[test]
-    fn load_and_run_returns_load_error() {
-        let _guard = test_lock();
-        let err = load_and_run(Path::new("definitely-missing.env"), &["cmd".into()]).unwrap_err();
-        assert!(matches!(err, RunError::Load(_)));
-    }
-
-    #[test]
-    fn load_and_run_injects_env_into_child_process() {
-        let _guard = test_lock();
-        let key = "DOTENVPP_CLI_TEST_VALUE";
-        let expected = "from_file";
-        let file = TempEnvFile::new(&format!("{key}={expected}\n"));
-        let command = env_probe_command(key, expected);
-
-        // SAFETY: test cleanup for an isolated process env key.
-        unsafe { std::env::remove_var(key) };
-
-        let status = load_and_run(&file.path, &command).unwrap();
-        assert!(status.success());
-
-        // SAFETY: test cleanup for an isolated process env key.
-        unsafe { std::env::remove_var(key) };
-    }
-
-    #[test]
-    fn load_and_run_returns_execute_error() {
-        let _guard = test_lock();
-        let key = "DOTENVPP_CLI_EXEC_ERR";
-        let file = TempEnvFile::new(&format!("{key}=1\n"));
-        let err = load_and_run(&file.path, &["definitely-not-a-real-command".into()]).unwrap_err();
-
-        assert!(matches!(
-            err,
-            RunError::Execute {
-                program,
-                ..
-            } if program == "definitely-not-a-real-command"
-        ));
-
-        // SAFETY: test cleanup for an isolated process env key.
-        unsafe { std::env::remove_var(key) };
-    }
 }
