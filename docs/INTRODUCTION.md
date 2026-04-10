@@ -4,15 +4,18 @@ DotenvPP is a from-scratch `.env` toolkit for Rust. It is a special superset of 
 
 ## Current Release
 
-Phase 0 ships the parser foundation:
+Phase 1 extends the parser foundation with interpolation and layered loading:
 
 - `KEY=VALUE` parsing
 - Comments, blank lines, and `export` prefixes
 - Single-quoted, double-quoted, and unquoted values
 - Multiline quoted values, BOM handling, and common escape sequences
-- `dotenvpp` facade helpers and Phase 0 CLI commands (`check`, `run`)
+- `${VAR}` interpolation with default, required, and alternative operators
+- Circular reference detection with source-aware errors
+- Layered loading for `.env`, `.env.{ENV}`, `.env.local`, and `.env.{ENV}.local`
+- `dotenvpp` facade helpers and CLI commands with `--env` / `-e` support
 
-Roadmap items described elsewhere in the repository remain design targets for future phases; the currently shipped API is the parser/loading surface above.
+Roadmap items described elsewhere in the repository remain design targets for later phases; the currently shipped API covers parsing, interpolation, and layered loading.
 
 ## Why This Direction
 
@@ -20,7 +23,6 @@ DotenvPP is intentionally not "just another env-user crate". The goal is to own 
 
 ## What Comes Next
 
-- Phase 1: variable interpolation and layering
 - Phase 2: schema and type system
 - Phase 3: encryption
 - Phase 4: expressions

@@ -2,7 +2,7 @@
   <h1 align="center">🔐 DotenvPP</h1>
   <p align="center"><strong>Dotenv, but evolved. Environment configuration for the modern era.</strong></p>
   <p align="center">
-    <em>Phase 0 foundation in Rust. Interpolation and layering are next.</em>
+    <em>Phase 1 ships interpolation and layered loading in Rust.</em>
   </p>
 </p>
 
@@ -46,7 +46,7 @@ DotenvPP reimagines environment configuration from first principles — taking e
 
 ## Features
 
-DotenvPP `0.0.2` is the Phase 0 release. It ships the parser foundation and the minimal facade/CLI needed to use it today.
+DotenvPP `0.0.3` ships the parser foundation plus Phase 1 interpolation and layered loading.
 
 | Capability | Status | Notes |
 |---|---|---|
@@ -54,10 +54,10 @@ DotenvPP `0.0.2` is the Phase 0 release. It ships the parser foundation and the 
 | Comments, blank lines, `export` | ✅ Shipped | Common dotenv syntax |
 | Single-quoted, double-quoted, and unquoted values | ✅ Shipped | Includes multiline quoted values |
 | BOM handling and common escape decoding | ✅ Shipped | Phase 0 parser behavior |
-| Load parsed values into `std::env` | ✅ Shipped | `load`, `from_path`, override variants |
-| CLI `check` and `run` commands | ✅ Shipped | Current CLI surface |
-| Variable interpolation (`${VAR}`) | ⏳ Phase 1 | Planned next |
-| Environment layering | ⏳ Phase 1 | Planned next |
+| Load parsed values into `std::env` | ✅ Shipped | Includes layered loading and override variants |
+| CLI `check` and `run` commands | ✅ Shipped | Supports `--file` and `--env` |
+| Variable interpolation (`${VAR}`) | ✅ Shipped | Includes default, required, alternative, and `$$` escaping |
+| Environment layering | ✅ Shipped | `.env` < `.env.{ENV}` < `.env.local` < `.env.{ENV}.local` |
 | Schema and type system | ⏳ Phase 2 | Roadmap |
 | Encryption | ⏳ Phase 3 | Roadmap |
 | Expression language | ⏳ Phase 4 | Roadmap |
@@ -68,7 +68,7 @@ DotenvPP `0.0.2` is the Phase 0 release. It ships the parser foundation and the 
 
 ## Quick Start
 
-The commands and APIs below are what exist today in Phase 0. Higher-level APIs for schemas, encryption, expressions, policies, and WASM are still roadmap items in [docs/TODO.md](docs/TODO.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+The commands and APIs below reflect the current shipped surface. Higher-level APIs for schemas, encryption, expressions, policies, and WASM remain roadmap items in [docs/TODO.md](docs/TODO.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ### CLI
 
@@ -76,24 +76,28 @@ The commands and APIs below are what exist today in Phase 0. Higher-level APIs f
 # Install
 cargo install dotenvpp-cli
 
-# Check that a .env file parses successfully
-dotenvpp check --file .env
+# Check the layered config for a selected environment
+dotenvpp check --env production
 
-# Load a .env file and run a command with those variables
-dotenvpp run --file .env -- cargo test
+# Load the layered production stack and run a command with those variables
+dotenvpp run --env production -- cargo test
+
+# Or target one explicit file
+dotenvpp check --file .env
 ```
 
 ### Rust Crate
 
 ```rust
 fn main() -> Result<(), dotenvpp::Error> {
-    dotenvpp::load()?;
+    dotenvpp::load_with_env("production")?;
 
     let app_name = dotenvpp::var("APP_NAME")?;
     println!("APP_NAME={app_name}");
 
-    let preview = dotenvpp::from_read(&b"PORT=3000\nDEBUG=true"[..])?;
+    let preview = dotenvpp::from_read(&b"HOST=localhost\nURL=http://${HOST}"[..])?;
     assert_eq!(preview.len(), 2);
+    assert_eq!(preview[1].value, "http://localhost");
 
     Ok(())
 }
@@ -104,10 +108,10 @@ fn main() -> Result<(), dotenvpp::Error> {
 ## What Makes It Different
 
 ### vs. dotenv / dotenvy
-DotenvPP starts with a from-scratch parser instead of wrapping an existing dotenv crate. That keeps the Phase 0 surface small today while leaving room for interpolation, layering, schemas, and other roadmap features to grow on top of parser behavior the project owns.
+DotenvPP starts with a from-scratch parser instead of wrapping an existing dotenv crate. That leaves interpolation, layering, schemas, and later roadmap features on top of parser behavior the project owns.
 
 ### vs. dotenvx
-dotenvx is already further ahead on encrypted workflows. DotenvPP is taking a different path: first ship a solid parser and facade, then build Phase 1 interpolation/layering and later phases on that foundation in Rust.
+dotenvx is already further ahead on encrypted workflows. DotenvPP is taking a different path: ship a solid Rust parser, interpolation, and layering surface first, then build later phases on that foundation.
 
 ### vs. HashiCorp Vault / AWS Secrets Manager
 Those are infrastructure products. DotenvPP is a developer-facing library and CLI. Even in Phase 0, the goal is local parsing/loading ergonomics rather than replacing secret-management platforms.
@@ -125,7 +129,7 @@ Current workspace layout:
 dotenvpp/
 ├── crates/
 │   ├── dotenvpp-parser/    # Phase 0 parser engine
-│   └── dotenvpp-cli/       # Phase 0 CLI binary
+│   └── dotenvpp-cli/       # CLI binary with layered loading support
 ├── src/lib.rs              # Facade crate API
 ├── tests/                  # Facade integration tests
 ├── examples/               # In-crate examples
@@ -141,7 +145,7 @@ Planned crates such as `dotenvpp-schema`, `dotenvpp-expr`, `dotenvpp-policy`, `d
 | Phase | Description | Status |
 |---|---|---|
 | 0 | Foundation — Standard `.env` parsing | ✅ Complete |
-| 1 | Interpolation & environment layering | 🔜 Next |
+| 1 | Interpolation & environment layering | ✅ Implemented |
 | 2 | Schema & type system | 📋 Planned |
 | 3 | Encryption | 📋 Planned |
 | 4 | Expression language | 📋 Planned |
@@ -180,7 +184,7 @@ Planned later phases introduce additional dependencies such as `miette`, `serde`
 
 ## Contributing
 
-DotenvPP has shipped Phase 0 and is moving toward Phase 1. Contributions welcome.
+DotenvPP has shipped Phase 1 and is moving toward Phase 2. Contributions welcome.
 
 1. Read [docs/RESEARCH.md](docs/RESEARCH.md) for context
 2. Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the technical vision
