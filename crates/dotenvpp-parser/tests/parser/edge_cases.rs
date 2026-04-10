@@ -61,6 +61,7 @@ fn crlf_line_endings() {
     assert_eq!(pairs.len(), 3);
     assert_eq!(pairs[0].value, "1");
     assert_eq!(pairs[1].value, "2");
+    assert_eq!(pairs[2].value, "3");
 }
 
 #[test]

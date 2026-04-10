@@ -164,6 +164,11 @@ where
 /// Parse a single-quoted value. No escape processing.
 /// Content is literal between the opening and closing `'`, including
 /// multiline content.
+///
+/// Also supports POSIX-style `'\''` concatenation: when a closing `'`
+/// is followed by `\'` and another `'`, the escaped quote is inserted
+/// as a literal `'` and parsing continues into the next single-quoted
+/// segment.  This makes `.env` files fully `source`-compatible.
 fn parse_single_quoted<'a, I>(
     value_start: &str,
     line_num: usize,
@@ -180,6 +185,16 @@ where
             Some(close_pos) => {
                 result.push_str(&remaining[..close_pos]);
                 let tail = &remaining[close_pos + 1..];
+
+                // POSIX concatenation: 'text1'\''text2'
+                // When closing quote is followed by \' and another ',
+                // insert a literal ' and continue parsing the next segment.
+                if tail.starts_with("\\'") && tail[2..].starts_with('\'') {
+                    result.push('\'');
+                    remaining = &tail[3..]; // skip \'' and continue
+                    continue;
+                }
+
                 if !tail.is_empty() {
                     result.push_str(&parse_unquoted(tail));
                 }
@@ -343,4 +358,5 @@ fn push_escaped_char(result: &mut String, escaped: char) {
 }
 
 #[cfg(test)]
+#[path = "../tests/parser/mod.rs"]
 mod tests;

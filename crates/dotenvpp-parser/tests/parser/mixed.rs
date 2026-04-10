@@ -16,6 +16,8 @@ fn with_comments_and_blanks() {
     let input = "# Header\n\nA=1\n# Middle\nB=2\n\n# End";
     let pairs = parse(input).unwrap();
     assert_eq!(pairs.len(), 2);
+    assert_eq!(pairs[0].value, "1");
+    assert_eq!(pairs[1].value, "2");
 }
 
 #[test]
@@ -23,6 +25,9 @@ fn export_and_regular() {
     let input = "export A=1\nB=2\nexport C=3";
     let pairs = parse(input).unwrap();
     assert_eq!(pairs.len(), 3);
+    assert_eq!(pairs[0].value, "1");
+    assert_eq!(pairs[1].value, "2");
+    assert_eq!(pairs[2].value, "3");
 }
 
 #[test]
@@ -81,7 +86,12 @@ fn realistic_docker_compose_style() {
                  REDIS_URL=redis://localhost:6379/0";
     let pairs = parse(input).unwrap();
     assert_eq!(pairs.len(), 4);
-    assert_eq!(pairs[1].value, "p@ssw0rd!");
+
+    let find = |key: &str| -> &str { &pairs.iter().find(|p| p.key == key).unwrap().value };
+    assert_eq!(find("COMPOSE_PROJECT_NAME"), "myproject");
+    assert_eq!(find("MYSQL_ROOT_PASSWORD"), "p@ssw0rd!");
+    assert_eq!(find("MYSQL_DATABASE"), "app_db");
+    assert_eq!(find("REDIS_URL"), "redis://localhost:6379/0");
 }
 
 #[test]
@@ -89,6 +99,9 @@ fn consecutive_exports() {
     let input = "export A=1\nexport B=2\nexport C=3";
     let pairs = parse(input).unwrap();
     assert_eq!(pairs.len(), 3);
+    assert_eq!(pairs[0].value, "1");
+    assert_eq!(pairs[1].value, "2");
+    assert_eq!(pairs[2].value, "3");
 }
 
 #[test]
@@ -109,6 +122,9 @@ fn comments_every_other_line() {
     let input = "# c1\nA=1\n# c2\nB=2\n# c3\nC=3";
     let pairs = parse(input).unwrap();
     assert_eq!(pairs.len(), 3);
+    assert_eq!(pairs[0].value, "1");
+    assert_eq!(pairs[1].value, "2");
+    assert_eq!(pairs[2].value, "3");
 }
 
 #[test]

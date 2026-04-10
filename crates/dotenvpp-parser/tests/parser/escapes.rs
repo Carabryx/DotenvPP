@@ -61,3 +61,15 @@ fn no_escapes_in_single_quoted() {
     let pairs = parse("KEY='hello\\nworld'").unwrap();
     assert_eq!(pairs[0].value, "hello\\nworld");
 }
+
+#[test]
+fn value_starts_with_escape() {
+    let pairs = parse("KEY=\"\\nhello\"").unwrap();
+    assert_eq!(pairs[0].value, "\nhello");
+}
+
+#[test]
+fn value_ends_with_escape() {
+    let pairs = parse("KEY=\"hello\\n\"").unwrap();
+    assert_eq!(pairs[0].value, "hello\n");
+}
