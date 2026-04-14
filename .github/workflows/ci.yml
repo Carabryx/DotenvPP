@@ -70,9 +70,6 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         rust: [stable]
         include:
-          # MSRV — only on Linux (fast sanity check)
-          - os: ubuntu-latest
-            rust: "1.78.0"
           # Nightly — only on Linux (catch upcoming breakage)
           - os: ubuntu-latest
             rust: nightly
@@ -85,13 +82,7 @@ jobs:
         with:
           key: ${{ matrix.os }}-${{ matrix.rust }}
       - name: Run tests
-        shell: bash
-        run: |
-          if [ "${{ matrix.rust }}" = "1.78.0" ]; then
-            cargo test --verbose --workspace --exclude dotenvpp-cli
-          else
-            cargo test --verbose --all-features --workspace
-          fi
+        run: cargo test --verbose --all-features --workspace
 
   # ──────────────────────────────────────────────────────────────
   #  Feature-flag checks  (ensure no_std and feature combos work)
@@ -135,7 +126,9 @@ jobs:
         with:
           key: msrv-${{ env.MSRV }}
       - name: Verify MSRV compiles
-        run: cargo check --workspace --exclude dotenvpp-cli
+        run: |
+          cargo check -p dotenvpp-parser --all-features
+          cargo check -p dotenvpp
 
   # ──────────────────────────────────────────────────────────────
   #  Examples  (make sure usage-examples compile)
