@@ -67,13 +67,7 @@ EMPTY_VAR=
     let pairs = parse(input).unwrap();
     assert_eq!(pairs.len(), 12);
 
-    let find = |key: &str| -> &str {
-        &pairs
-            .iter()
-            .find(|p| p.key == key)
-            .unwrap()
-            .value
-    };
+    let find = |key: &str| -> &str { &pairs.iter().find(|p| p.key == key).unwrap().value };
     assert_eq!(find("APP_NAME"), "dotenvpp");
     assert_eq!(find("DB_NAME"), "my_application");
     assert_eq!(find("DB_USER"), "admin");
@@ -93,13 +87,7 @@ fn realistic_docker_compose_style() {
     let pairs = parse(input).unwrap();
     assert_eq!(pairs.len(), 4);
 
-    let find = |key: &str| -> &str {
-        &pairs
-            .iter()
-            .find(|p| p.key == key)
-            .unwrap()
-            .value
-    };
+    let find = |key: &str| -> &str { &pairs.iter().find(|p| p.key == key).unwrap().value };
     assert_eq!(find("COMPOSE_PROJECT_NAME"), "myproject");
     assert_eq!(find("MYSQL_ROOT_PASSWORD"), "p@ssw0rd!");
     assert_eq!(find("MYSQL_DATABASE"), "app_db");
