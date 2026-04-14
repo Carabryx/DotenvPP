@@ -17,6 +17,8 @@ fn multiple_pairs() {
     assert_eq!(pairs.len(), 3);
     assert_eq!(pairs[0].key, "A");
     assert_eq!(pairs[0].value, "1");
+    assert_eq!(pairs[1].key, "B");
+    assert_eq!(pairs[1].value, "2");
     assert_eq!(pairs[2].key, "C");
     assert_eq!(pairs[2].value, "3");
 }

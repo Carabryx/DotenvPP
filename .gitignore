@@ -17,6 +17,8 @@ Thumbs.db
 
 # Usage examples build artifacts
 usage-examples/target/
+temp/
+tmp/
 
 # Environment files — ignore by default, allow tracked demo/example files
 .env*

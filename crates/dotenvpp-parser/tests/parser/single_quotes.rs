@@ -68,3 +68,39 @@ fn with_backslash() {
     let pairs = parse(r"KEY='c:\path\to\file'").unwrap();
     assert_eq!(pairs[0].value, r"c:\path\to\file");
 }
+
+#[test]
+fn escape_sequences_treated_literally() {
+    // In single quotes, \n \t \r etc. are NOT interpreted — kept verbatim.
+    let pairs = parse(r"KEY='hello\nworld\ttab\r'").unwrap();
+    assert_eq!(pairs[0].value, r"hello\nworld\ttab\r");
+}
+
+#[test]
+fn posix_single_quote_escape() {
+    // POSIX concatenation: 'it'\''s' → it's
+    // Closing ' + \' + opening ' = literal quote and continue
+    let pairs = parse(r"KEY='it'\''s'").unwrap();
+    assert_eq!(pairs[0].value, "it's");
+}
+
+#[test]
+fn posix_multiple_escaped_quotes() {
+    // 'it'\''s a '\''test' → it's a 'test
+    let pairs = parse(r"KEY='it'\''s a '\''test'").unwrap();
+    assert_eq!(pairs[0].value, "it's a 'test");
+}
+
+#[test]
+fn posix_escaped_quote_at_start() {
+    // ''\''quoted' → 'quoted
+    let pairs = parse(r"KEY=''\''quoted'").unwrap();
+    assert_eq!(pairs[0].value, "'quoted");
+}
+
+#[test]
+fn posix_escaped_quote_at_end() {
+    // 'value'\''' → value' (close, escape-quote, open+close empty segment)
+    let pairs = parse(r"KEY='value'\'''").unwrap();
+    assert_eq!(pairs[0].value, "value'");
+}

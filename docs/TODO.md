@@ -30,18 +30,18 @@
 
 > **Goal**: Support `${VAR}` interpolation and multi-environment file loading.
 
-- [ ] Implement `${VAR}` basic interpolation
-- [ ] Implement `${VAR:-default}` (default if empty/unset)
-- [ ] Implement `${VAR:?error}` (required with error message)
-- [ ] Implement `${VAR:+alternative}` (alternative if set)
-- [ ] Implement `$$` escape for literal dollar sign
-- [ ] Implement environment layering (`.env` < `.env.local` < `.env.{ENV}` < `.env.{ENV}.local`)
-- [ ] Add `--env` / `-e` flag to CLI for environment selection
-- [ ] Detect circular interpolation references and report clear errors
-- [ ] Test interpolation edge cases (nested, recursive, missing vars)
-- [ ] Write integration tests for layered loading
+- [x] Implement `${VAR}` basic interpolation
+- [x] Implement `${VAR:-default}` (default if empty/unset)
+- [x] Implement `${VAR:?error}` (required with error message)
+- [x] Implement `${VAR:+alternative}` (alternative if set)
+- [x] Implement `$$` escape for literal dollar sign
+- [x] Implement environment layering (`.env` < `.env.{ENV}` < `.env.local` < `.env.{ENV}.local`)
+- [x] Add `--env` / `-e` flag to CLI for environment selection
+- [x] Detect circular interpolation references and report clear errors
+- [x] Test interpolation edge cases (nested, recursive, missing vars)
+- [x] Write integration tests for layered loading
 
-**Exit Criteria**: Full interpolation parity with dotenvx + layered environments.
+**Exit Criteria**: Phase 1 was completed and published as `0.0.3`.
 
 ---
 

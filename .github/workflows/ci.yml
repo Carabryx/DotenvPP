@@ -16,18 +16,12 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  MSRV: "1.78.0"
 
+# ──────────────────────────────────────────────────────────────
+#  Lightweight single-OS checks  (fast, ~1 min each)
+# ──────────────────────────────────────────────────────────────
 jobs:
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Run tests
-        run: cargo test --verbose --all-features --workspace
-
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
@@ -36,7 +30,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
-      - uses: Swatinem/rust-cache@v2
       - name: Check formatting
         run: cargo fmt --all -- --check
 
@@ -64,8 +57,85 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
 
+  # ──────────────────────────────────────────────────────────────
+  #  Cross-platform test matrix  (OS × Rust version)
+  # ──────────────────────────────────────────────────────────────
+  test:
+    name: Test (${{ matrix.os }}, ${{ matrix.rust }})
+    needs: [fmt, clippy]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        rust: [stable]
+        include:
+          # Nightly — only on Linux (catch upcoming breakage)
+          - os: ubuntu-latest
+            rust: nightly
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}-${{ matrix.rust }}
+      - name: Run tests
+        run: cargo test --verbose --all-features --workspace
+
+  # ──────────────────────────────────────────────────────────────
+  #  Feature-flag checks  (ensure no_std and feature combos work)
+  # ──────────────────────────────────────────────────────────────
+  features:
+    name: Feature Flags
+    needs: [fmt, clippy]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "parser: no default features (no_std)"
+            args: "-p dotenvpp-parser --no-default-features"
+          - name: "parser: std feature"
+            args: "-p dotenvpp-parser --features std"
+          - name: "workspace: all features"
+            args: "--workspace --all-features"
+          - name: "workspace: default features"
+            args: "--workspace"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: "Check: ${{ matrix.name }}"
+        run: cargo check ${{ matrix.args }}
+
+  # ──────────────────────────────────────────────────────────────
+  #  MSRV verification  (PR-only — validates rust-version field)
+  # ──────────────────────────────────────────────────────────────
+  msrv:
+    name: MSRV Verify
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.MSRV }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv-${{ env.MSRV }}
+      - name: Verify MSRV compiles
+        run: |
+          cargo check -p dotenvpp-parser --all-features
+          cargo check -p dotenvpp
+
+  # ──────────────────────────────────────────────────────────────
+  #  Examples  (make sure usage-examples compile)
+  # ──────────────────────────────────────────────────────────────
   examples:
     name: Examples
+    needs: [fmt, clippy]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -74,8 +144,12 @@ jobs:
       - name: Build examples
         run: cargo build --examples --verbose
 
+  # ──────────────────────────────────────────────────────────────
+  #  Code coverage  (Linux only, uploads to Codecov)
+  # ──────────────────────────────────────────────────────────────
   coverage:
     name: Code Coverage
+    needs: [test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -93,3 +167,18 @@ jobs:
           slug: ${{ github.repository }}
           fail_ci_if_error: true
           verbose: true
+
+  # ──────────────────────────────────────────────────────────────
+  #  Final gate  (single status check for branch protection)
+  # ──────────────────────────────────────────────────────────────
+  ci-pass:
+    name: CI Pass
+    if: always()
+    needs: [fmt, clippy, doc, test, features, examples, coverage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decide whether all jobs succeeded
+        uses: re-actors/alls-green@release/v1
+        with:
+          allowed-skips: msrv
+          jobs: ${{ toJSON(needs) }}

@@ -2,10 +2,12 @@
 name = "dotenvpp-cli"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "CLI for parsing, checking, and loading .env files with DotenvPP"
+readme = "README.md"
 
 [[bin]]
 name = "dotenvpp"
