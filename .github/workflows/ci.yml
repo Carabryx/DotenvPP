@@ -85,9 +85,11 @@ jobs:
         with:
           key: ${{ matrix.os }}-${{ matrix.rust }}
       - name: Run tests
+        shell: bash
         run: |
           if [ "${{ matrix.rust }}" = "1.78.0" ]; then
-            cargo test --verbose --all-features --workspace --exclude dotenvpp-cli
+            cargo test --verbose -p dotenvpp-parser --all-features
+            cargo test --verbose -p dotenvpp
           else
             cargo test --verbose --all-features --workspace
           fi
@@ -134,7 +136,9 @@ jobs:
         with:
           key: msrv-${{ env.MSRV }}
       - name: Verify MSRV compiles
-        run: cargo check --workspace --all-features --exclude dotenvpp-cli
+        run: |
+          cargo check -p dotenvpp-parser --all-features
+          cargo check -p dotenvpp
 
   # ──────────────────────────────────────────────────────────────
   #  Examples  (make sure usage-examples compile)
