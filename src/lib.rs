@@ -215,7 +215,9 @@ impl<'a> Resolver<'a> {
         Self {
             entries,
             entry_index,
-            env_snapshot: env::vars().collect(),
+            env_snapshot: env::vars_os()
+                .filter_map(|(k, v)| Some((k.into_string().ok()?, v.into_string().ok()?)))
+                .collect(),
             cache: HashMap::with_capacity(entries.len()),
             stack: Vec::with_capacity(entries.len()),
         }

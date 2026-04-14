@@ -8,6 +8,6 @@ It focuses on syntax parsing only:
 - Comments, blank lines, and `export`
 - Single-quoted, double-quoted, and unquoted values
 - Multiline quoted values
-- `no_std` support with the default `std` feature enabled
+- `no_std` support (`std` is enabled by default; disable it with `default-features = false`)
 
 If you want interpolation, layered loading, or process environment helpers, use the top-level [`dotenvpp`](../../README.md) crate instead.

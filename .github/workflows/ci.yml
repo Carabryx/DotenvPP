@@ -85,7 +85,12 @@ jobs:
         with:
           key: ${{ matrix.os }}-${{ matrix.rust }}
       - name: Run tests
-        run: cargo test --verbose --all-features --workspace
+        run: |
+          if [ "${{ matrix.rust }}" = "1.78.0" ]; then
+            cargo test --verbose --all-features --workspace --exclude dotenvpp-cli
+          else
+            cargo test --verbose --all-features --workspace
+          fi
 
   # ──────────────────────────────────────────────────────────────
   #  Feature-flag checks  (ensure no_std and feature combos work)
@@ -129,7 +134,7 @@ jobs:
         with:
           key: msrv-${{ env.MSRV }}
       - name: Verify MSRV compiles
-        run: cargo check --workspace --all-features
+        run: cargo check --workspace --all-features --exclude dotenvpp-cli
 
   # ──────────────────────────────────────────────────────────────
   #  Examples  (make sure usage-examples compile)

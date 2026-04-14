@@ -19,7 +19,7 @@ This directory contains examples that use the `dotenvpp` crate, demonstrating re
 |---|---|---|
 | `01_basic_loading` | `cargo run --bin basic-loading` | `load()` + `var()` — the most common usage |
 | `02_from_read` | `cargo run --bin from-read` | Parse from a byte string, no file needed |
-| `03_interpolation` | `cargo run --bin interpolation` | `${VAR}`, `${:-default}`, `${:+alt}`, `$$`, chaining |
+| `03_interpolation` | `cargo run --bin interpolation` | `${VAR}`, `${VAR:-default}`, `${VAR:+alt}`, `$$`, chaining |
 | `04_layered_env` | `cargo run --bin layered-env` | Default layered stack (`.env` + `.env.local`) |
 | `05_production` | `cargo run --bin production` | Full production stack (all 4 layers) |
 | `06_preview_without_loading` | `cargo run --bin preview-without-loading` | `from_path_iter()` — filter without setting env |
