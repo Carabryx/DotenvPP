@@ -71,7 +71,7 @@ EMPTY_VAR=
         &pairs
             .iter()
             .find(|p| p.key == key)
-            .expect("expected key to be present in parsed pairs")
+            .unwrap()
             .value
     };
     assert_eq!(find("APP_NAME"), "dotenvpp");
@@ -97,7 +97,7 @@ fn realistic_docker_compose_style() {
         &pairs
             .iter()
             .find(|p| p.key == key)
-            .expect("expected key to be present in parsed pairs")
+            .unwrap()
             .value
     };
     assert_eq!(find("COMPOSE_PROJECT_NAME"), "myproject");
