@@ -14,11 +14,34 @@ homepage = "https://github.com/Carabryx/DotenvPP"
 
 # ── Shared dependency versions ──
 [workspace.dependencies]
-dotenvpp        = { path = ".", version = "=0.0.3" }
-dotenvpp-parser = { path = "crates/dotenvpp-parser", version = "=0.0.3" }
-thiserror       = { version = "2", default-features = false }
-clap            = { version = "4", features = ["derive"] }
-criterion       = { version = "0.8", features = ["html_reports"] }
+dotenvpp         = { path = ".", version = "=0.0.3" }
+dotenvpp-crypto  = { path = "crates/dotenvpp-crypto", version = "=0.0.3" }
+dotenvpp-expr    = { path = "crates/dotenvpp-expr", version = "=0.0.3" }
+dotenvpp-macros  = { path = "crates/dotenvpp-macros", version = "=0.0.3" }
+dotenvpp-parser  = { path = "crates/dotenvpp-parser", version = "=0.0.3" }
+dotenvpp-policy  = { path = "crates/dotenvpp-policy", version = "=0.0.3" }
+dotenvpp-schema  = { path = "crates/dotenvpp-schema", version = "=0.0.3" }
+aes-gcm          = { version = "0.10" }
+base64           = { version = "0.22" }
+clap             = { version = "4", features = ["derive"] }
+crabgraph        = { version = "0.3.3" }
+criterion        = { version = "0.8", features = ["html_reports"] }
+getrandom        = { version = "0.3" }
+hex              = { version = "0.4" }
+hkdf             = { version = "0.12" }
+proc-macro2      = { version = "1" }
+quote            = { version = "1" }
+rand_core        = { version = "0.6", features = ["getrandom"] }
+regex-lite       = { version = "0.1" }
+serde            = { version = "1", features = ["derive"] }
+serde_json       = { version = "1" }
+sha2             = { version = "0.10" }
+syn              = { version = "2", features = ["full"] }
+thiserror        = { version = "2", default-features = false }
+toml             = { version = "0.8", default-features = false, features = ["parse"] }
+wasm-bindgen     = { version = "0.2" }
+x25519-dalek     = { version = "2", features = ["static_secrets"] }
+zeroize          = { version = "1", features = ["derive"] }
 
 [workspace.lints.clippy]
 unwrap_used = "warn"
@@ -48,7 +71,18 @@ exclude = [
 ]
 
 [dependencies]
+dotenvpp-expr = { workspace = true }
 dotenvpp-parser = { workspace = true }
+dotenvpp-policy = { workspace = true }
+dotenvpp-schema = { workspace = true }
+dotenvpp-crypto = { workspace = true, optional = true }
+dotenvpp-macros = { workspace = true, optional = true }
+
+[features]
+default = ["crypto-crabgraph", "macros"]
+crypto-crabgraph = ["dep:dotenvpp-crypto", "dotenvpp-crypto/crypto-crabgraph"]
+crypto-rustcrypto = ["dep:dotenvpp-crypto", "dotenvpp-crypto/crypto-rustcrypto"]
+macros = ["dep:dotenvpp-macros"]
 
 [dev-dependencies]
 criterion = { workspace = true }
@@ -59,3 +93,10 @@ workspace = true
 [[bench]]
 name = "parser_benchmark"
 harness = false
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

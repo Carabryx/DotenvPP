@@ -1,32 +1,43 @@
 # Introduction
 
-DotenvPP is a from-scratch `.env` toolkit for Rust. It is a special superset of the familiar file format: it understands common `.env` syntax, but it is not a wrapper around `dotenvy` or any other parser.
+DotenvPP is a from-scratch `.env` toolkit for Rust. It remains compatible with common dotenv syntax, but the workspace now includes typed schemas, encrypted env files, computed expressions, policy checks, and WASM bindings.
 
-## Current Release
+## Current Workspace
 
-Phase 1 extends the parser foundation with interpolation and layered loading:
+This branch contains the Phase 0-6 implementation:
 
-- `KEY=VALUE` parsing
-- Comments, blank lines, and `export` prefixes
-- Single-quoted, double-quoted, and unquoted values
-- Multiline quoted values, BOM handling, and common escape sequences
-- `${VAR}` interpolation with default, required, and alternative operators
-- Circular reference detection with source-aware errors
-- Layered loading for `.env`, `.env.{ENV}`, `.env.local`, and `.env.{ENV}.local`
-- `dotenvpp` facade helpers and CLI commands with `--env` / `-e` support
+- `.env` parsing with comments, blank lines, `export`, quotes, multiline values, BOM handling, and escape decoding
+- `${VAR}` interpolation with default, required, alternative, and literal-dollar handling
+- layered loading for `.env`, `.env.{ENV}`, `.env.local`, and `.env.{ENV}.local`
+- `.env.schema` TOML parsing, validation, defaults, generated examples, Markdown docs, JSON Schema export, and schema inference
+- `#[derive(dotenvpp::Schema)]` for Rust structs
+- X25519/AES-256-GCM encrypted env files with CrabGraph as the default backend and RustCrypto as an opt-in backend
+- sandboxed computed expressions with deterministic tracking and opt-in `env()` / `file()` access
+- `.env.policy` files with `error`, `warning`, and `info` severities
+- CLI commands for check, run, schema generation, linting, keygen, encrypt, decrypt, and rotate
+- `dotenvpp-wasm` bindings for JavaScript parse, validate, and policy checks
+- a browser playground source wired to the generated web WASM package
 
-Roadmap items described elsewhere in the repository remain design targets for later phases; the currently shipped API covers parsing, interpolation, and layered loading.
+Publishing to crates.io/npm, full browser/edge automation, KMS integrations, formal security review, and standalone WASI packaging remain separate release/hardening tasks tracked in [TODO.md](TODO.md).
 
 ## Why This Direction
 
-DotenvPP is intentionally not "just another env-user crate". The goal is to own the parsing and configuration surface from the ground up so the project can grow into typed config, policies, and other higher-level features without inheriting someone else's design limits.
+DotenvPP is intentionally not a wrapper around `dotenvy` or another env crate. Owning the parser and configuration model lets the project add validation, policy, encryption, and WASM support without inheriting another crate's syntax or architecture limits.
 
-## What Comes Next
+## Fast Path
 
-- Phase 2: schema and type system
-- Phase 3: encryption
-- Phase 4: expressions
-- Phase 5: policies
-- Phase 6: WASM
-- Phase 7: DX and ecosystem tooling
-- Phase 8: advanced features
+```bash
+cargo install --path crates/dotenvpp-cli
+dotenvpp check --file .env --schema .env.schema
+dotenvpp lint --file .env --policy .env.policy
+dotenvpp run --env production -- cargo test
+```
+
+For WASM:
+
+```bash
+cd crates/dotenvpp-wasm
+npm run build:all
+npm run smoke:node
+npm run smoke:bun
+```

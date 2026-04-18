@@ -1,0 +1,80 @@
+# DotenvPP Phase 2-6 Completion Log
+
+Branch: `feature/phase-2-6-implementation`
+Started: 2026-04-18
+
+## Change Log
+
+- Created feature branch `feature/phase-2-6-implementation` from `main`.
+- Added this completion log to track implementation, refactor, documentation, and verification work as it happens.
+- Verified the pre-refactor baseline with `cargo test --workspace`; all existing tests passed.
+- Re-checked current upstream documentation for CrabGraph, RustCrypto AES-GCM, wasm-bindgen, and wasm-pack before designing the Phase 2-6 implementation.
+- Updated the workspace manifest to add Phase 2-6 crate boundaries: `dotenvpp-schema`, `dotenvpp-expr`, `dotenvpp-policy`, `dotenvpp-crypto`, `dotenvpp-macros`, and `dotenvpp-wasm`.
+- Added workspace dependency declarations for TOML/JSON schema handling, expression functions, policy evaluation, crypto backends, procedural macros, and WASM bindings.
+- Added root facade feature flags with CrabGraph as the default crypto backend and RustCrypto as an opt-in backend.
+- Added `crates/dotenvpp-schema` with `.env.schema` TOML parsing, supported primitive/rich/array/enum types, default handling, required/optional semantics, secret markers, validation diagnostics, `.env.example` generation, Markdown docs generation, JSON Schema export, duration parsing, and schema inference from parsed env pairs.
+- Added `crates/dotenvpp-expr` with a sandboxed recursive-descent expression parser/evaluator supporting arithmetic, comparisons, logical operators, implication, `if/then/else`, `${VAR}` references, string functions, hashing, base64, duration parsing, UUID/time functions, deterministic tracking, and opt-in `env()`/`file()` access.
+- Added `crates/dotenvpp-policy` with `.env.policy` TOML parsing, rule severity levels, expression-backed condition evaluation, violation reporting, and a built-in standard security policy library for common production/debug/SSL/localhost/default-credential mistakes.
+- Added `crates/dotenvpp-crypto` with a versioned encrypted `.env` JSON format, X25519/HKDF recipient key wrapping, AES-256-GCM per-variable encryption with associated data, base64 keypairs, multiple-recipient encryption, decryption, tamper detection coverage, and key rotation. The crate selects exactly one backend: default CrabGraph or opt-in RustCrypto.
+- Added `crates/dotenvpp-macros` with `#[derive(Schema)]` support for named Rust structs, mapping common Rust field types into DotenvPP schema definitions and supporting `#[env(...)]` metadata such as required/default/secret/description/values/range/length constraints.
+- Added `crates/dotenvpp-wasm` with `wasm-bindgen` bindings for parsing, schema validation, and policy checks, plus `@dotenvpp/wasm` package metadata and wasm-pack build/test scripts.
+- Updated the root `dotenvpp` facade to re-export schema, expression, policy, macro, and optional crypto modules while preserving existing Phase 0-1 APIs.
+- Added facade helpers for opt-in computed expression evaluation, schema loading/validation, schema inference, policy loading/evaluation, encrypted env decryption/loading, and encrypted file generation when crypto features are enabled.
+- Replaced the Phase 1 CLI implementation with the Phase 2-5 command surface: schema-aware `check`, strict policy checks, `lint`, `schema init/example/docs/json-schema`, `keygen`, `encrypt`, `decrypt`, `rotate`, and encrypted `run` support.
+- Ran `cargo test --workspace`; the new crate graph compiled and existing Phase 0-1 tests passed, with one crypto tamper-test assertion needing adjustment because backend error text is not stable.
+- Fixed the crypto tamper test to assert backend-independent failure on authenticated-data tampering and removed an unused schema import surfaced by compilation.
+- Re-ran `cargo test --workspace`; all workspace tests and doctests passed with the default CrabGraph crypto backend.
+- Ran `cargo test -p dotenvpp-crypto --no-default-features --features crypto-rustcrypto`; all RustCrypto backend crypto tests passed.
+- Ran `cargo fmt --all -- --check`; rustfmt reported layout-only differences in newly added files.
+- Applied `cargo fmt --all` to format the refactor consistently.
+- Ran `cargo clippy --workspace --all-targets`; clippy completed and reported warnings in new expression, policy, schema, and crypto test code.
+- Fixed clippy warnings by using struct update initialization, deriving the default policy severity, removing an `expect()` from email validation, and replacing cloned single-item slices in crypto tests.
+- Re-ran `cargo fmt --all` and `cargo clippy --workspace --all-targets`; clippy completed cleanly with no warnings.
+- Added integration tests for `#[derive(dotenvpp::Schema)]`, computed expression evaluation through the facade, schema validation, policy evaluation, facade crypto encrypt/decrypt, CLI schema generation/checking, strict policy failure reporting, and CLI keygen/encrypt/decrypt roundtrips.
+- Ran `cargo test --workspace` after adding integration tests; all tests passed, with a dead-code warning from the test-only derive struct.
+- Added `#[allow(dead_code)]` to the test-only derive struct to keep verification output warning-free.
+- Ran `cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets` again; rustfmt found layout-only differences in new tests and clippy flagged one `expect()` in a CLI integration test.
+- Applied `cargo fmt --all` and replaced the test-only `expect()` with `unwrap()` under the test module's existing allowance.
+- Re-ran `cargo fmt --all -- --check`; formatting passed.
+- Re-ran `cargo clippy --workspace --all-targets`; clippy passed cleanly.
+- Re-ran `cargo test --workspace`; all workspace tests and doctests passed with no warnings after adding Phase 2-6 integration coverage.
+- Checked Phase 6 tooling: `wasm32-unknown-unknown` target is installed, `wasm-pack 0.13.1` is installed, Node `v25.9.0` and Bun `1.3.12` are installed, and Deno is not installed locally.
+- Ran `wasm-pack build crates/dotenvpp-wasm --target bundler --out-dir pkg`; it failed because `uuid` requires an explicit WASM randomness backend.
+- Enabled the `uuid` crate's `js` feature so `uuid()` expressions can compile for browser/bundler WASM targets.
+- Replaced the schema crate's full `url` dependency with a conservative built-in URL scheme validator to reduce the Phase 6 WASM dependency graph and binary size.
+- Added a WASM package post-build script that rewrites generated package metadata to the intended npm name `@dotenvpp/wasm` and adds explicit package exports.
+- Ignored generated WASM package output directories (`crates/dotenvpp-wasm/pkg/` and `pkg-web/`) so source control stays focused on reproducible sources.
+- Ran `npm run build` in `crates/dotenvpp-wasm`; bundler WASM build succeeded and generated package metadata now uses `@dotenvpp/wasm`.
+- Measured the generated bundler WASM size after removing `url`: raw `1,616,795` bytes and gzip `582,600` bytes, still above the Phase 6 target.
+- Added size-focused release profile settings (`opt-level = "z"`, LTO, one codegen unit, `panic = "abort"`, and strip) to reduce release/WASM output.
+- Re-ran `npm run build` after size profile changes; Rust compilation succeeded, but `wasm-opt` failed validation because the output uses bulk memory operations.
+- Added wasm-pack release metadata to run `wasm-opt` with `-Oz --enable-bulk-memory`.
+- Rebuilt the WASM package successfully with bulk-memory-aware `wasm-opt`; measured raw `1,262,889` bytes and gzip `480,189` bytes, still above the target.
+- Replaced the schema crate's `regex` dependency with `regex-lite`, which keeps runtime regex validation while reducing binary size and compile-time overhead.
+- Removed the `time` dependency from schema and expression crates; schema now uses lightweight RFC3339-shape validation and `now()` returns a Unix timestamp string, reducing WASM size further.
+- Ran `cargo fmt --all`, `cargo test --workspace`, and `cargo clippy --workspace --all-targets` after the WASM size-reduction changes; all passed.
+- Rebuilt `@dotenvpp/wasm` after size reductions; final bundler artifact is raw `512,861` bytes and gzip `199,407` bytes, under the Phase 6 `< 200KB gzipped` target.
+- Ran a Node WASM smoke test; it exposed a real `wasm32` trap because the facade interpolation resolver tried to snapshot process environment variables.
+- Fixed the facade resolver to use an empty process-environment snapshot on `wasm32`, preserving native fallback behavior while making WASM parse/validate safe.
+- Rebuilt and smoke-tested WASM after the `wasm32` resolver fix; Node parse/validate/policy checks passed, but final gzip size was `202,789` bytes, slightly above target.
+- Removed the `uuid` dependency and replaced expression `uuid()` with a lightweight UUID-shaped uniqueness helper so the WASM package does not pull random UUID glue. It is suitable for computed config identifiers, not secret generation.
+- Switched the workspace `toml` dependency to parse-only features so schema and policy parsing stay intact while unused TOML display support is not linked into release/WASM builds.
+- Replaced the `dotenvpp-wasm` boundary's generic `serde_json` serialization with explicit JSON serializers for parse output, schema validation reports, and policy reports.
+- Rebuilt the bundler and web WASM packages after final size work; both artifacts are raw `494,069` bytes and gzip `196,149` bytes, under the Phase 6 `< 200KB gzipped` target.
+- Added reproducible WASM smoke scripts: `npm run smoke:node` for the bundler output and `npm run smoke:bun` for the web output initialized with Bun.
+- Ran `npm run smoke:node`; parse, schema validation, and policy checking passed under Node `v25.9.0` with Node's experimental WASM module warning.
+- Ran `npm run smoke:bun`; parse, schema validation, and policy checking passed under Bun `1.3.12` using the web-target initializer.
+- Added a browser playground source at `crates/dotenvpp-wasm/playground/index.html` wired to the reproducible `pkg-web` build output.
+- Rewrote `README.md` to document the Phase 0-6 workspace, CLI command surface, schema, policy, expression, encryption, WASM, workspace layout, and verification commands.
+- Rewrote `docs/INTRODUCTION.md` so it no longer describes Phase 2-6 as future-only work and instead distinguishes implemented source work from publishing/hardening tasks.
+- Rewrote `docs/ARCHITECTURE.md` to match the implemented crate graph, facade boundaries, crypto backend shape, WASM exports, and current verification gates.
+- Updated `docs/TODO.md` to mark implemented Phase 2-6 items complete while leaving explicit unchecked items for hardening tasks that were not actually performed, including `miette`, KMS, formal audit, full browser/edge automation, Deno, WASI packaging, and libFuzzer/cargo-fuzz harnesses.
+- Ran final `cargo fmt --all -- --check`; formatting passed.
+- Ran final `cargo test --workspace`; all workspace tests and doctests passed.
+- Ran final `cargo clippy --workspace --all-targets`; clippy passed with no warnings.
+- Ran final `cargo test -p dotenvpp-crypto --no-default-features --features crypto-rustcrypto`; the RustCrypto backend tests passed.
+- Ran final `npm run build:all`; both bundler and web WASM packages built successfully.
+- Re-measured final WASM artifacts after the full build: both `pkg` and `pkg-web` are raw `494,069` bytes and gzip `196,149` bytes.
+- Ran final `npm run smoke:node` and `npm run smoke:bun`; JavaScript parse, schema validation, and policy checks passed in both runtimes.
+- Ran `cargo check -p dotenvpp --no-default-features`; the facade compiles without optional macro/crypto features.
+- Ran `cargo check -p dotenvpp-wasm --target wasm32-unknown-unknown`; the WASM crate compiles for the target directly.

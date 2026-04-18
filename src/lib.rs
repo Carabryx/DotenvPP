@@ -30,7 +30,31 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "macros")]
+pub use dotenvpp_macros::Schema;
 pub use dotenvpp_parser::{EnvPair, ParseError};
+pub use dotenvpp_schema::ConfigSchema;
+
+/// Schema parsing and validation APIs.
+pub mod schema {
+    pub use dotenvpp_schema::*;
+}
+
+/// Safe expression language APIs.
+pub mod expr {
+    pub use dotenvpp_expr::*;
+}
+
+/// Policy-as-code APIs.
+pub mod policy {
+    pub use dotenvpp_policy::*;
+}
+
+/// Encryption APIs. Available when a crypto backend feature is enabled.
+#[cfg(any(feature = "crypto-crabgraph", feature = "crypto-rustcrypto"))]
+pub mod crypto {
+    pub use dotenvpp_crypto::*;
+}
 
 /// Errors that can occur when loading `.env` files.
 #[derive(Debug)]
@@ -41,6 +65,15 @@ pub enum Error {
     Parse(ParseError),
     /// Interpolation failed after parsing.
     Interpolation(InterpolationError),
+    /// Schema parsing failed.
+    Schema(dotenvpp_schema::SchemaError),
+    /// Policy parsing failed.
+    Policy(dotenvpp_policy::PolicyError),
+    /// Expression evaluation failed.
+    Expression(dotenvpp_expr::ExprError),
+    /// Encryption or decryption failed.
+    #[cfg(any(feature = "crypto-crabgraph", feature = "crypto-rustcrypto"))]
+    Crypto(dotenvpp_crypto::CryptoError),
     /// An environment variable was not found or not valid unicode.
     NotPresent(String),
     /// An environment variable was found but contained invalid unicode.
@@ -53,6 +86,11 @@ impl std::fmt::Display for Error {
             Self::Io(err) => write!(f, "I/O error: {err}"),
             Self::Parse(err) => write!(f, "parse error: {err}"),
             Self::Interpolation(err) => write!(f, "interpolation error: {err}"),
+            Self::Schema(err) => write!(f, "schema error: {err}"),
+            Self::Policy(err) => write!(f, "policy error: {err}"),
+            Self::Expression(err) => write!(f, "expression error: {err}"),
+            #[cfg(any(feature = "crypto-crabgraph", feature = "crypto-rustcrypto"))]
+            Self::Crypto(err) => write!(f, "crypto error: {err}"),
             Self::NotPresent(key) => write!(f, "environment variable `{key}` not found"),
             Self::NotUnicode(key) => {
                 write!(f, "environment variable `{key}` contains invalid unicode")
@@ -67,6 +105,11 @@ impl std::error::Error for Error {
             Self::Io(err) => Some(err),
             Self::Parse(err) => Some(err),
             Self::Interpolation(err) => Some(err),
+            Self::Schema(err) => Some(err),
+            Self::Policy(err) => Some(err),
+            Self::Expression(err) => Some(err),
+            #[cfg(any(feature = "crypto-crabgraph", feature = "crypto-rustcrypto"))]
+            Self::Crypto(err) => Some(err),
             Self::NotPresent(_) | Self::NotUnicode(_) => None,
         }
     }
@@ -87,6 +130,31 @@ impl From<ParseError> for Error {
 impl From<InterpolationError> for Error {
     fn from(err: InterpolationError) -> Self {
         Self::Interpolation(err)
+    }
+}
+
+impl From<dotenvpp_schema::SchemaError> for Error {
+    fn from(err: dotenvpp_schema::SchemaError) -> Self {
+        Self::Schema(err)
+    }
+}
+
+impl From<dotenvpp_policy::PolicyError> for Error {
+    fn from(err: dotenvpp_policy::PolicyError) -> Self {
+        Self::Policy(err)
+    }
+}
+
+impl From<dotenvpp_expr::ExprError> for Error {
+    fn from(err: dotenvpp_expr::ExprError) -> Self {
+        Self::Expression(err)
+    }
+}
+
+#[cfg(any(feature = "crypto-crabgraph", feature = "crypto-rustcrypto"))]
+impl From<dotenvpp_crypto::CryptoError> for Error {
+    fn from(err: dotenvpp_crypto::CryptoError) -> Self {
+        Self::Crypto(err)
     }
 }
 
@@ -215,9 +283,7 @@ impl<'a> Resolver<'a> {
         Self {
             entries,
             entry_index,
-            env_snapshot: env::vars_os()
-                .filter_map(|(k, v)| Some((k.into_string().ok()?, v.into_string().ok()?)))
-                .collect(),
+            env_snapshot: process_env_snapshot(),
             cache: HashMap::with_capacity(entries.len()),
             stack: Vec::with_capacity(entries.len()),
         }
@@ -468,6 +534,152 @@ pub fn from_read<R: Read>(mut reader: R) -> Result<Vec<EnvPair>> {
     reader.read_to_string(&mut content)?;
     let pairs = dotenvpp_parser::parse(&content)?;
     resolve_entries(merge_entries([(None, pairs)]))
+}
+
+/// Parse, interpolate, and evaluate expression-like values from any reader.
+///
+/// The standard [`from_read`] API intentionally preserves string values. This
+/// helper is opt-in for computed configuration such as
+/// `MAX_WORKERS=${CPU_COUNT} * 2 + 1`.
+pub fn from_read_evaluated<R: Read>(reader: R) -> Result<Vec<EnvPair>> {
+    let pairs = from_read(reader)?;
+    evaluate_computed_pairs(&pairs)
+}
+
+/// Evaluate expression-like values in parsed pairs.
+pub fn evaluate_computed_pairs(pairs: &[EnvPair]) -> Result<Vec<EnvPair>> {
+    let mut variables = pairs
+        .iter()
+        .map(|pair| (pair.key.clone(), pair.value.clone()))
+        .collect::<HashMap<_, _>>();
+    let mut evaluated = Vec::with_capacity(pairs.len());
+
+    for pair in pairs {
+        let value = if looks_like_expression(&pair.value) {
+            dotenvpp_expr::eval(&pair.value, &variables)?.to_env_string()
+        } else {
+            pair.value.clone()
+        };
+        variables.insert(pair.key.clone(), value.clone());
+        evaluated.push(EnvPair {
+            key: pair.key.clone(),
+            value,
+            line: pair.line,
+        });
+    }
+
+    Ok(evaluated)
+}
+
+/// Read a `.env.schema` file.
+pub fn schema_from_path<P: AsRef<Path>>(path: P) -> Result<dotenvpp_schema::SchemaDocument> {
+    let content = fs::read_to_string(path)?;
+    dotenvpp_schema::SchemaDocument::from_toml_str(&content).map_err(Error::from)
+}
+
+/// Validate an explicit `.env` file against a schema file.
+pub fn validate_path_with_schema<P, S>(
+    env_path: P,
+    schema_path: S,
+) -> Result<dotenvpp_schema::ValidationReport>
+where
+    P: AsRef<Path>,
+    S: AsRef<Path>,
+{
+    let pairs = from_path_iter(env_path)?.collect::<Vec<_>>();
+    let schema = schema_from_path(schema_path)?;
+    Ok(schema.validate_pairs(&pairs))
+}
+
+/// Validate layered environment files against a schema file.
+pub fn validate_layered_with_schema<P>(
+    environment: Option<&str>,
+    schema_path: P,
+) -> Result<dotenvpp_schema::ValidationReport>
+where
+    P: AsRef<Path>,
+{
+    let pairs = from_layered_env(environment)?;
+    let schema = schema_from_path(schema_path)?;
+    Ok(schema.validate_pairs(&pairs))
+}
+
+/// Generate `.env.schema` TOML from an explicit env file.
+pub fn infer_schema_from_path<P: AsRef<Path>>(path: P) -> Result<String> {
+    let pairs = from_path_iter(path)?.collect::<Vec<_>>();
+    Ok(dotenvpp_schema::infer_schema_toml(&pairs))
+}
+
+/// Read a `.env.policy` file.
+pub fn policy_from_path<P: AsRef<Path>>(path: P) -> Result<dotenvpp_policy::PolicyDocument> {
+    let content = fs::read_to_string(path)?;
+    dotenvpp_policy::PolicyDocument::from_toml_str(&content).map_err(Error::from)
+}
+
+/// Evaluate a policy against parsed pairs.
+pub fn evaluate_policy_for_pairs(
+    pairs: &[EnvPair],
+    policy: &dotenvpp_policy::PolicyDocument,
+) -> dotenvpp_policy::PolicyReport {
+    let variables = pairs
+        .iter()
+        .map(|pair| (pair.key.clone(), pair.value.clone()))
+        .collect::<HashMap<_, _>>();
+    policy.evaluate(&variables)
+}
+
+/// Evaluate a policy file against an explicit `.env` file.
+pub fn evaluate_policy_for_path<P, S>(
+    env_path: P,
+    policy_path: S,
+) -> Result<dotenvpp_policy::PolicyReport>
+where
+    P: AsRef<Path>,
+    S: AsRef<Path>,
+{
+    let pairs = from_path_iter(env_path)?.collect::<Vec<_>>();
+    let policy = policy_from_path(policy_path)?;
+    Ok(evaluate_policy_for_pairs(&pairs, &policy))
+}
+
+/// Encrypt an explicit `.env` file for recipients and return encrypted JSON.
+#[cfg(any(feature = "crypto-crabgraph", feature = "crypto-rustcrypto"))]
+pub fn encrypt_path_to_string<P: AsRef<Path>>(
+    path: P,
+    recipient_public_keys: &[String],
+) -> Result<String> {
+    let pairs = from_path_iter(path)?.collect::<Vec<_>>();
+    dotenvpp_crypto::encrypt_pairs_to_string(&pairs, recipient_public_keys).map_err(Error::from)
+}
+
+/// Decrypt encrypted JSON into env pairs.
+#[cfg(any(feature = "crypto-crabgraph", feature = "crypto-rustcrypto"))]
+pub fn decrypt_env_str(input: &str, private_key: &str) -> Result<Vec<EnvPair>> {
+    dotenvpp_crypto::decrypt_str(input, private_key).map_err(Error::from)
+}
+
+/// Load an encrypted env file using the provided private key.
+#[cfg(any(feature = "crypto-crabgraph", feature = "crypto-rustcrypto"))]
+pub fn load_encrypted_path<P: AsRef<Path>>(
+    path: P,
+    private_key: &str,
+    override_existing: bool,
+) -> Result<Vec<EnvPair>> {
+    let content = fs::read_to_string(path)?;
+    let pairs = decrypt_env_str(&content, private_key)?;
+    apply_pairs(&pairs, override_existing);
+    Ok(pairs)
+}
+
+/// Load an encrypted env file using `DOTENV_PRIVATE_KEY`.
+#[cfg(any(feature = "crypto-crabgraph", feature = "crypto-rustcrypto"))]
+pub fn load_encrypted_path_from_env<P: AsRef<Path>>(
+    path: P,
+    override_existing: bool,
+) -> Result<Vec<EnvPair>> {
+    let private_key = env::var("DOTENV_PRIVATE_KEY")
+        .map_err(|_| Error::NotPresent("DOTENV_PRIVATE_KEY".to_owned()))?;
+    load_encrypted_path(path, &private_key, override_existing)
 }
 
 /// Get a single environment variable's value.
@@ -726,4 +938,45 @@ fn is_valid_var_name(name: &str) -> bool {
     }
 
     bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'.')
+}
+
+#[cfg(target_arch = "wasm32")]
+fn process_env_snapshot() -> HashMap<String, String> {
+    HashMap::new()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn process_env_snapshot() -> HashMap<String, String> {
+    env::vars_os()
+        .filter_map(|(k, v)| Some((k.into_string().ok()?, v.into_string().ok()?)))
+        .collect()
+}
+
+fn looks_like_expression(value: &str) -> bool {
+    let trimmed = value.trim();
+    trimmed.starts_with("if ")
+        || [
+            " + ", " - ", " * ", " / ", " % ", " == ", " != ", " <= ", " >= ", " < ", " > ",
+            " && ", " || ", "=>",
+        ]
+        .iter()
+        .any(|needle| trimmed.contains(needle))
+        || [
+            "len(",
+            "upper(",
+            "lower(",
+            "trim(",
+            "contains(",
+            "starts_with(",
+            "ends_with(",
+            "concat(",
+            "sha256(",
+            "base64_encode(",
+            "base64_decode(",
+            "duration(",
+            "uuid(",
+            "now(",
+        ]
+        .iter()
+        .any(|prefix| trimmed.starts_with(prefix))
 }

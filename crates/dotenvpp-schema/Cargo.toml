@@ -1,0 +1,21 @@
+[package]
+name = "dotenvpp-schema"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Typed schema parsing, validation, and documentation generation for DotenvPP"
+readme = "README.md"
+
+[dependencies]
+dotenvpp-parser = { workspace = true }
+regex-lite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
+
+[lints]
+workspace = true

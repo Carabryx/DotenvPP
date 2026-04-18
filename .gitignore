@@ -17,6 +17,8 @@ Thumbs.db
 
 # Usage examples build artifacts
 usage-examples/target/
+crates/dotenvpp-wasm/pkg/
+crates/dotenvpp-wasm/pkg-web/
 temp/
 tmp/
 

@@ -203,3 +203,115 @@ fn cli_rejects_file_and_env_together() {
     assert!(stderr.contains("--file"));
     assert!(stderr.contains("--env"));
 }
+
+#[test]
+fn schema_commands_generate_and_check() {
+    let temp_dir = TempDir::new();
+    let env_file = temp_dir.path.join("app.env");
+    let schema_file = temp_dir.path.join(".env.schema");
+    let example_file = temp_dir.path.join(".env.example");
+    write_file(&env_file, "PORT=3000\nAPI_KEY=abcdefgh\n");
+
+    let output = run_and_collect(
+        cli_command()
+            .arg("schema")
+            .arg("init")
+            .arg("--file")
+            .arg(&env_file)
+            .arg("--output")
+            .arg(&schema_file),
+    );
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(fs::read_to_string(&schema_file).unwrap().contains("[vars.PORT]"));
+
+    let output = run_and_collect(
+        cli_command()
+            .arg("schema")
+            .arg("example")
+            .arg("--schema")
+            .arg(&schema_file)
+            .arg("--output")
+            .arg(&example_file),
+    );
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(fs::read_to_string(&example_file).unwrap().contains("PORT="));
+
+    let output = run_and_collect(
+        cli_command()
+            .arg("check")
+            .arg("--file")
+            .arg(&env_file)
+            .arg("--schema")
+            .arg(&schema_file),
+    );
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("typed variable"));
+}
+
+#[test]
+fn check_strict_reports_policy_errors() {
+    let temp_dir = TempDir::new();
+    let env_file = temp_dir.path.join("app.env");
+    let policy_file = temp_dir.path.join(".env.policy");
+    write_file(&env_file, "ENV=production\nLOG_LEVEL=debug\n");
+    write_file(
+        &policy_file,
+        r#"
+        [[rules]]
+        name = "no-debug"
+        condition = "ENV == 'production' && LOG_LEVEL == 'debug'"
+        severity = "error"
+        "#,
+    );
+
+    let output = run_and_collect(
+        cli_command()
+            .arg("check")
+            .arg("--file")
+            .arg(&env_file)
+            .arg("--strict")
+            .arg("--policy")
+            .arg(&policy_file),
+    );
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("no-debug"));
+}
+
+#[test]
+fn keygen_encrypt_and_decrypt_roundtrip() {
+    let temp_dir = TempDir::new();
+    let env_file = temp_dir.path.join("app.env");
+    let enc_file = temp_dir.path.join(".env.enc");
+    write_file(&env_file, "SECRET=from_file\n");
+
+    let keygen = run_and_collect(cli_command().arg("keygen"));
+    assert!(keygen.status.success(), "stderr: {}", String::from_utf8_lossy(&keygen.stderr));
+    let keypair: serde_json::Value = serde_json::from_slice(&keygen.stdout).unwrap();
+    let public_key = keypair["public_key"].as_str().unwrap();
+    let private_key = keypair["private_key"].as_str().unwrap();
+
+    let encrypted = run_and_collect(
+        cli_command()
+            .arg("encrypt")
+            .arg("--file")
+            .arg(&env_file)
+            .arg("--recipient")
+            .arg(public_key)
+            .arg("--output")
+            .arg(&enc_file),
+    );
+    assert!(encrypted.status.success(), "stderr: {}", String::from_utf8_lossy(&encrypted.stderr));
+    assert!(fs::read_to_string(&enc_file).unwrap().contains("dotenvpp.enc.v1"));
+
+    let decrypted = run_and_collect(
+        cli_command()
+            .arg("decrypt")
+            .arg("--file")
+            .arg(&enc_file)
+            .arg("--private-key")
+            .arg(private_key),
+    );
+    assert!(decrypted.status.success(), "stderr: {}", String::from_utf8_lossy(&decrypted.stderr));
+    assert!(String::from_utf8_lossy(&decrypted.stdout).contains("SECRET=from_file"));
+}

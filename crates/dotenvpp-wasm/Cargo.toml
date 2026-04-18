@@ -1,0 +1,23 @@
+[package]
+name = "dotenvpp-wasm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "WASM bindings for DotenvPP parsing, schema validation, and policy checks"
+readme = "README.md"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+dotenvpp = { path = "../..", version = "=0.0.3", default-features = false }
+wasm-bindgen = { workspace = true }
+
+[lints]
+workspace = true
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz", "--enable-bulk-memory"]
